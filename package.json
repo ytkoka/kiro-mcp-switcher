@@ -1,0 +1,227 @@
+{
+  "name": "kiro-mcp-switcher",
+  "displayName": "Kiro MCP Switcher",
+  "description": "Toggle and switch profiles of MCP servers in Kiro's mcp.json without hand-editing JSON.",
+  "version": "0.1.0",
+  "publisher": "ytkoka",
+  "author": {
+    "name": "ytkoka"
+  },
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ytkoka/kiro-mcp-switcher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ytkoka/kiro-mcp-switcher/issues"
+  },
+  "homepage": "https://github.com/ytkoka/kiro-mcp-switcher#readme",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "kiro",
+    "mcp",
+    "model context protocol",
+    "profile",
+    "switcher"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kiroMcpSwitcher",
+          "title": "MCP Switcher",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiroMcpSwitcher": [
+        {
+          "id": "kiroMcpSwitcher.view",
+          "name": "MCP Switcher",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kiroMcpSwitcher.switchProfile",
+        "title": "Switch Profile",
+        "category": "Kiro MCP",
+        "icon": "$(layers)"
+      },
+      {
+        "command": "kiroMcpSwitcher.applyProfile",
+        "title": "Apply Profile",
+        "category": "Kiro MCP",
+        "icon": "$(play)"
+      },
+      {
+        "command": "kiroMcpSwitcher.toggleServer",
+        "title": "Toggle Server",
+        "category": "Kiro MCP",
+        "icon": "$(circle-large-outline)"
+      },
+      {
+        "command": "kiroMcpSwitcher.toggleServers",
+        "title": "Toggle Servers (multi-select)",
+        "category": "Kiro MCP",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "kiroMcpSwitcher.saveProfile",
+        "title": "Save Current as Profile",
+        "category": "Kiro MCP",
+        "icon": "$(save)"
+      },
+      {
+        "command": "kiroMcpSwitcher.deleteProfile",
+        "title": "Delete Profile",
+        "category": "Kiro MCP",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "kiroMcpSwitcher.selectTarget",
+        "title": "Select Target (Workspace / User)",
+        "category": "Kiro MCP",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "kiroMcpSwitcher.openConfig",
+        "title": "Open mcp.json",
+        "category": "Kiro MCP",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "kiroMcpSwitcher.refresh",
+        "title": "Refresh",
+        "category": "Kiro MCP",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "kiroMcpSwitcher.switchProfile",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroMcpSwitcher.saveProfile",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kiroMcpSwitcher.selectTarget",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "navigation@3"
+        },
+        {
+          "command": "kiroMcpSwitcher.refresh",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "navigation@4"
+        },
+        {
+          "command": "kiroMcpSwitcher.openConfig",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "overflow@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "kiroMcpSwitcher.applyProfile",
+          "when": "view == kiroMcpSwitcher.view && viewItem == profile",
+          "group": "inline"
+        },
+        {
+          "command": "kiroMcpSwitcher.deleteProfile",
+          "when": "view == kiroMcpSwitcher.view && viewItem == profile",
+          "group": "1_modify"
+        },
+        {
+          "command": "kiroMcpSwitcher.toggleServer",
+          "when": "view == kiroMcpSwitcher.view && viewItem =~ /^server:/",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kiroMcpSwitcher.applyProfile",
+          "when": "false"
+        },
+        {
+          "command": "kiroMcpSwitcher.toggleServer",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Kiro MCP Switcher",
+      "properties": {
+        "kiroMcpSwitcher.target": {
+          "type": "string",
+          "enum": [
+            "workspace",
+            "user"
+          ],
+          "enumDescriptions": [
+            "Act on the workspace file: .kiro/settings/mcp.json",
+            "Act on the user file: ~/.kiro/settings/mcp.json"
+          ],
+          "default": "workspace",
+          "description": "Which mcp.json the switcher reads from and writes to."
+        },
+        "kiroMcpSwitcher.stateField": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "enabled"
+          ],
+          "default": "disabled",
+          "description": "Which per-server field controls on/off. Kiro's documented field is `disabled`; use `enabled` only if your config uses that key instead."
+        },
+        "kiroMcpSwitcher.profiles": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "markdownDescription": "Named profiles. Each profile is a list of MCP server names that should be **enabled**; every other server in mcp.json is disabled when the profile is applied.\n\nExample:\n```json\n{\n  \"frontend\": [\"fetch\", \"playwright\"],\n  \"aws\": [\"aws-docs\", \"aws-knowledge\"]\n}\n```"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "vscode:prepublish": "npm run package",
+    "vsix": "vsce package",
+    "publish:ovsx": "ovsx publish"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.84.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.23.1",
+    "ovsx": "^0.9.5",
+    "typescript": "^5.5.4"
+  }
+}
