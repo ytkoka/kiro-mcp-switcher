@@ -2,7 +2,7 @@
   "name": "kiro-mcp-switcher",
   "displayName": "Kiro MCP Switcher",
   "description": "Toggle and switch profiles of MCP servers in Kiro's mcp.json without hand-editing JSON.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "ytkoka",
   "author": {
     "name": "ytkoka"

@@ -37,7 +37,8 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('kiroMcpSwitcher.refresh', refresh),
     vscode.commands.registerCommand('kiroMcpSwitcher.switchProfile', () => switchProfile(refresh)),
-    vscode.commands.registerCommand('kiroMcpSwitcher.applyProfile', async (name?: string) => {
+    vscode.commands.registerCommand('kiroMcpSwitcher.applyProfile', async (arg?: unknown) => {
+      const name = resolveName(arg);
       if (!name) {
         return switchProfile(refresh);
       }
@@ -47,7 +48,8 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.setStatusBarMessage(`MCP profile "${name}" applied`, 2000);
       });
     }),
-    vscode.commands.registerCommand('kiroMcpSwitcher.toggleServer', async (name?: string) => {
+    vscode.commands.registerCommand('kiroMcpSwitcher.toggleServer', async (arg?: unknown) => {
+      const name = resolveName(arg);
       if (!name) {
         return toggleServersQuickPick(refresh);
       }
@@ -64,8 +66,8 @@ export function activate(context: vscode.ExtensionContext): void {
       toggleServersQuickPick(refresh),
     ),
     vscode.commands.registerCommand('kiroMcpSwitcher.saveProfile', () => saveProfile(refresh)),
-    vscode.commands.registerCommand('kiroMcpSwitcher.deleteProfile', async (name?: string) => {
-      const target = name ?? (await pickProfile('Select a profile to delete'));
+    vscode.commands.registerCommand('kiroMcpSwitcher.deleteProfile', async (arg?: unknown) => {
+      const target = resolveName(arg) ?? (await pickProfile('Select a profile to delete'));
       if (!target) {
         return;
       }
@@ -87,6 +89,27 @@ export function activate(context: vscode.ExtensionContext): void {
 
   setupWatcher(context);
   void refresh();
+}
+
+/**
+ * Tree menu commands (inline/context buttons) receive the tree element object,
+ * while the status bar, palette, and item.command pass a plain name string.
+ * Normalize both to the name string.
+ */
+function resolveName(arg: unknown): string | undefined {
+  if (typeof arg === 'string') {
+    return arg;
+  }
+  if (arg && typeof arg === 'object') {
+    const o = arg as { name?: unknown; label?: unknown };
+    if (typeof o.name === 'string') {
+      return o.name;
+    }
+    if (typeof o.label === 'string') {
+      return o.label;
+    }
+  }
+  return undefined;
 }
 
 async function guard(fn: () => Promise<void>): Promise<void> {
