@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Add Config Presets: named presets, each a complete `mcpServers` definition stored as files
+  under `<settings>/mcp-presets/`. Applying swaps the mcp.json `mcpServers` block wholesale
+  (other keys and comments preserved) so Kiro sees exactly that preset's servers.
+- Save-current / new-empty / duplicate; automatic pre-apply snapshot with Restore Last Snapshot;
+  one-click Window Reload after apply. New "Config Presets" sidebar section.
+
 ## 0.1.2
 
 - Fix: ツリーのインライン/コンテキストのボタン（プロファイル Apply、サーバー切替、プロファイル削除）が

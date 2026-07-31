@@ -8,11 +8,40 @@ Kiro watches `mcp.json` and reconciles running servers on save, so changes apply
 
 ## What it does
 
-- **Sidebar view** ("MCP Switcher" in the activity bar) listing your Profiles and Servers.
+- **Sidebar view** ("MCP Switcher" in the activity bar) listing your Config Presets, Profiles, and Servers.
 - **One‑click toggle** of any server (writes `disabled: true/false`).
 - **Profiles**: save the current on/off combination under a name, then switch to it later.
+- **Config Presets**: named, complete `mcpServers` definitions you can swap in wholesale — see below.
 - **Status bar item** showing the active profile and target, click to switch.
 - **Workspace vs. User target**, selectable in settings (see below).
+
+## Config presets (full swap)
+
+Profiles toggle `disabled` on existing servers, but every server definition still exists in
+`mcp.json` — that's not enough if you need Kiro to see *only* one endpoint (or one specific set)
+for isolated behavior testing. Config Presets solve that: each preset is a complete `mcpServers`
+object stored as its own file under `<settings>/mcp-presets/<name>.json` (next to the target
+`mcp.json`, so it follows the `workspace`/`user` target setting).
+
+Applying a preset replaces the **entire `mcpServers` block** in `mcp.json` with the preset's
+servers — nothing else survives the swap. Every other top-level key and every comment in
+`mcp.json` outside of `mcpServers` is left untouched.
+
+- **Create**: capture the current `mcp.json` as a preset ("Save Current as Preset"), start from
+  an empty preset and edit it by hand ("New Empty Preset"), or copy an existing one ("Duplicate
+  Preset").
+- **Snapshots**: applying a preset automatically snapshots the current `mcp.json` first (kept
+  under `<settings>/mcp-snapshots/`, last 10 retained). Use "Restore Last Snapshot" to undo the
+  most recent apply.
+- **Reload**: Kiro has no public command to force an MCP reload after an external file write, so
+  after applying a preset the extension offers a one-click **Reload Window**. Set
+  `kiroMcpSwitcher.reloadWindowOnApplyPreset` to `true` to reload automatically instead of being
+  prompted, or just use Kiro's own MCP panel reload if you'd rather not reload the whole window.
+
+Preset files can contain anything a normal `mcpServers` entry can, including tokens or other
+secrets for the servers they describe. If any of your presets hold sensitive values, keep
+`mcp-presets/` (and `mcp-snapshots/`) out of version control, the same way you'd treat `mcp.json`
+itself.
 
 ## Target: workspace or user
 
@@ -55,6 +84,13 @@ All under the **Kiro MCP** category:
 - Select Target (Workspace / User)
 - Open mcp.json
 - Refresh
+- Apply Config Preset
+- Save Current as Preset
+- New Empty Preset
+- Duplicate Preset
+- Delete Preset
+- Open Preset File
+- Restore Last Snapshot
 
 ## Build
 

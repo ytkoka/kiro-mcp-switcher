@@ -16,6 +16,17 @@ import {
   activeProfileName,
 } from './profiles';
 import { McpTreeProvider } from './tree';
+import {
+  listPresets,
+  applyPreset,
+  savePresetFromCurrent,
+  createEmptyPreset,
+  duplicatePreset,
+  deletePreset,
+  restoreLastSnapshot,
+  hasSnapshot,
+  presetFilePath,
+} from './configPresets';
 
 let statusBar: vscode.StatusBarItem;
 let watcher: vscode.FileSystemWatcher | undefined;
@@ -76,6 +87,25 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('kiroMcpSwitcher.selectTarget', () => selectTarget(refresh)),
     vscode.commands.registerCommand('kiroMcpSwitcher.openConfig', openConfig),
+    vscode.commands.registerCommand('kiroMcpSwitcher.applyPreset', (arg?: unknown) =>
+      applyPresetCmd(refresh, resolveName(arg)),
+    ),
+    vscode.commands.registerCommand('kiroMcpSwitcher.savePresetFromCurrent', () =>
+      savePresetCmd(refresh),
+    ),
+    vscode.commands.registerCommand('kiroMcpSwitcher.newEmptyPreset', () => newPresetCmd(refresh)),
+    vscode.commands.registerCommand('kiroMcpSwitcher.duplicatePreset', (arg?: unknown) =>
+      duplicatePresetCmd(refresh, resolveName(arg)),
+    ),
+    vscode.commands.registerCommand('kiroMcpSwitcher.deletePreset', (arg?: unknown) =>
+      deletePresetCmd(refresh, resolveName(arg)),
+    ),
+    vscode.commands.registerCommand('kiroMcpSwitcher.openPreset', (arg?: unknown) =>
+      openPresetCmd(resolveName(arg)),
+    ),
+    vscode.commands.registerCommand('kiroMcpSwitcher.restoreSnapshot', () =>
+      restoreSnapshotCmd(refresh),
+    ),
   );
 
   context.subscriptions.push(
@@ -264,4 +294,150 @@ async function openConfig(): Promise<void> {
 
 export function deactivate(): void {
   watcher?.dispose();
+}
+
+// ---------- config preset commands ----------
+
+async function pickPreset(placeHolder: string): Promise<string | undefined> {
+  const names = await listPresets();
+  if (names.length === 0) {
+    vscode.window.showInformationMessage('No presets yet. Use "Save Current as Preset" first.');
+    return undefined;
+  }
+  const pick = await vscode.window.showQuickPick(names, { placeHolder });
+  return pick;
+}
+
+async function offerReload(): Promise<void> {
+  const auto = vscode.workspace
+    .getConfiguration('kiroMcpSwitcher')
+    .get<boolean>('reloadWindowOnApplyPreset', false);
+  if (auto) {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+    return;
+  }
+  const choice = await vscode.window.showInformationMessage(
+    'Preset applied to mcp.json. Reload the window so Kiro re-reads it (or reload the server in Kiro\'s MCP panel).',
+    'Reload Window',
+  );
+  if (choice === 'Reload Window') {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+  }
+}
+
+async function applyPresetCmd(refresh: () => Promise<void>, preset?: string): Promise<void> {
+  const name = preset ?? (await pickPreset('Apply which config preset?'));
+  if (!name) {
+    return;
+  }
+  await guard(async () => {
+    await applyPreset(name);
+    await refresh();
+    await offerReload();
+  });
+}
+
+async function savePresetCmd(refresh: () => Promise<void>): Promise<void> {
+  const name = await vscode.window.showInputBox({
+    prompt: 'Name for this preset (captures the current mcp.json servers)',
+    validateInput: (v) => (v.trim() ? undefined : 'Please enter a name'),
+  });
+  if (!name) {
+    return;
+  }
+  await guard(async () => {
+    await savePresetFromCurrent(name.trim());
+    await refresh();
+    vscode.window.setStatusBarMessage(`Saved preset "${name.trim()}"`, 2500);
+  });
+}
+
+async function newPresetCmd(refresh: () => Promise<void>): Promise<void> {
+  const name = await vscode.window.showInputBox({
+    prompt: 'Name for the new empty preset (opens for editing)',
+    validateInput: (v) => (v.trim() ? undefined : 'Please enter a name'),
+  });
+  if (!name) {
+    return;
+  }
+  await guard(async () => {
+    const p = await createEmptyPreset(name.trim());
+    await refresh();
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+    await vscode.window.showTextDocument(doc);
+  });
+}
+
+async function duplicatePresetCmd(refresh: () => Promise<void>, preset?: string): Promise<void> {
+  const src = preset ?? (await pickPreset('Duplicate which preset?'));
+  if (!src) {
+    return;
+  }
+  const dst = await vscode.window.showInputBox({
+    prompt: `Name for the copy of "${src}"`,
+    value: `${src}-copy`,
+    validateInput: (v) => (v.trim() ? undefined : 'Please enter a name'),
+  });
+  if (!dst) {
+    return;
+  }
+  await guard(async () => {
+    await duplicatePreset(src, dst.trim());
+    await refresh();
+  });
+}
+
+async function deletePresetCmd(refresh: () => Promise<void>, preset?: string): Promise<void> {
+  const name = preset ?? (await pickPreset('Delete which preset?'));
+  if (!name) {
+    return;
+  }
+  const confirm = await vscode.window.showWarningMessage(
+    `Delete preset "${name}"? This removes the preset file.`,
+    { modal: true },
+    'Delete',
+  );
+  if (confirm !== 'Delete') {
+    return;
+  }
+  await guard(async () => {
+    await deletePreset(name);
+    await refresh();
+  });
+}
+
+async function openPresetCmd(preset?: string): Promise<void> {
+  const name = preset ?? (await pickPreset('Open which preset?'));
+  if (!name) {
+    return;
+  }
+  const p = presetFilePath(name);
+  if (!p) {
+    vscode.window.showErrorMessage('No workspace folder is open.');
+    return;
+  }
+  const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+  await vscode.window.showTextDocument(doc);
+}
+
+async function restoreSnapshotCmd(refresh: () => Promise<void>): Promise<void> {
+  if (!(await hasSnapshot())) {
+    vscode.window.showInformationMessage('No snapshot to restore yet. Snapshots are taken when you apply a preset.');
+    return;
+  }
+  const confirm = await vscode.window.showWarningMessage(
+    'Restore mcp.json to the most recent snapshot (taken before the last preset apply)?',
+    { modal: true },
+    'Restore',
+  );
+  if (confirm !== 'Restore') {
+    return;
+  }
+  await guard(async () => {
+    const ok = await restoreLastSnapshot();
+    await refresh();
+    if (ok) {
+      await offerReload();
+    }
+  });
 }

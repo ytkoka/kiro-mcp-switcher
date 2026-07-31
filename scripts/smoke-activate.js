@@ -1,113 +1,119 @@
-// Loads dist/extension.js against a minimal `vscode` mock, calls activate(),
-// and reports which commands got registered. Catches the class of bug where
-// a broken bundled dependency throws during activate() and silently leaves
-// zero commands registered (UI still renders from package.json contributions,
-// so the failure only surfaces as "command not found" at click time).
-'use strict';
-
-const Module = require('module');
+// Stub the 'vscode' module and load the bundled extension to verify activate() runs
+// without throwing and registers its commands. Run after `npm run package`.
 const path = require('path');
+const Module = require('module');
+const registered = [];
 
-const registeredCommands = new Set();
-
-class FakeEventEmitter {
-  constructor() {
-    this.event = () => ({ dispose() {} });
-  }
-  fire() {}
-  dispose() {}
+function disposable() {
+  return { dispose() {} };
 }
 
-const vscodeMock = {
+const vscodeStub = {
   StatusBarAlignment: { Left: 1, Right: 2 },
-  ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
-  EventEmitter: FakeEventEmitter,
+  ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
   ThemeIcon: class {
     constructor(id) {
       this.id = id;
     }
   },
   TreeItem: class {
-    constructor(label, collapsibleState) {
+    constructor(label, state) {
       this.label = label;
-      this.collapsibleState = collapsibleState;
+      this.collapsibleState = state;
     }
   },
-  Uri: { file: (p) => ({ fsPath: p, path: p }) },
+  EventEmitter: class {
+    constructor() {
+      this.event = () => disposable();
+    }
+    fire() {}
+    dispose() {}
+  },
+  Uri: { file: (p) => ({ fsPath: p, scheme: 'file', path: p }) },
   RelativePattern: class {
-    constructor(base, pattern) {
+    constructor(base, pat) {
       this.base = base;
-      this.pattern = pattern;
+      this.pattern = pat;
     }
   },
   window: {
+    registerTreeDataProvider: (id) => {
+      registered.push('view:' + id);
+      return disposable();
+    },
     createStatusBarItem: () => ({
+      command: '',
+      text: '',
+      tooltip: '',
       show() {},
       hide() {},
       dispose() {},
     }),
-    registerTreeDataProvider: () => ({ dispose() {} }),
-    showErrorMessage: () => {},
-    showInformationMessage: () => {},
+    setStatusBarMessage: () => disposable(),
     showQuickPick: async () => undefined,
     showInputBox: async () => undefined,
+    showInformationMessage: () => {},
+    showWarningMessage: async () => undefined,
+    showErrorMessage: (m) => {
+      console.log('ERROR MSG:', m);
+    },
     showTextDocument: async () => {},
-    setStatusBarMessage: () => {},
-  },
-  workspace: {
-    onDidChangeConfiguration: () => ({ dispose() {} }),
-    createFileSystemWatcher: () => ({
-      onDidChange: () => ({ dispose() {} }),
-      onDidCreate: () => ({ dispose() {} }),
-      onDidDelete: () => ({ dispose() {} }),
-      dispose() {},
-    }),
-    getConfiguration: () => ({
-      get: () => undefined,
-      update: async () => {},
-    }),
-    workspaceFolders: undefined,
-    openTextDocument: async () => ({}),
   },
   commands: {
     registerCommand: (id) => {
-      registeredCommands.add(id);
-      return { dispose() {} };
+      registered.push('cmd:' + id);
+      return disposable();
     },
+    executeCommand: async () => {},
+  },
+  workspace: {
+    workspaceFolders: undefined,
+    getConfiguration: () => ({ get: (k, d) => d, update: async () => {} }),
+    onDidChangeConfiguration: () => disposable(),
+    createFileSystemWatcher: () => ({
+      onDidChange() {},
+      onDidCreate() {},
+      onDidDelete() {},
+      dispose() {},
+    }),
+    openTextDocument: async () => ({}),
   },
 };
 
-const originalResolve = Module._resolveFilename;
-Module._resolveFilename = function (request, ...rest) {
-  if (request === 'vscode') {
-    return 'vscode';
-  }
-  return originalResolve.call(this, request, ...rest);
+const orig = Module._load;
+Module._load = function (request, ...args) {
+  if (request === 'vscode') return vscodeStub;
+  return orig.call(this, request, ...args);
 };
 
-const originalLoad = Module._load;
-Module._load = function (request, ...rest) {
-  if (request === 'vscode') {
-    return vscodeMock;
-  }
-  return originalLoad.call(this, request, ...rest);
+const store = new Map();
+const context = {
+  subscriptions: [],
+  globalState: { get: (k, d) => (store.has(k) ? store.get(k) : d), update: async (k, v) => store.set(k, v) },
+  workspaceState: { get: (k, d) => d, update: async () => {} },
+  secrets: { get: async () => undefined, store: async () => {}, delete: async () => {} },
 };
 
-const extensionPath = path.join(__dirname, '..', 'dist', 'extension.js');
-const extension = require(extensionPath);
-
-const context = { subscriptions: [] };
-extension.activate(context);
-
-const hasSwitchProfile = registeredCommands.has('kiroMcpSwitcher.switchProfile');
-
-console.log('registered commands:', [...registeredCommands].sort());
-console.log('has switchProfile:', hasSwitchProfile);
-
-if (!hasSwitchProfile) {
-  console.error('SMOKE TEST FAILED: kiroMcpSwitcher.switchProfile was not registered');
-  process.exit(1);
+const bundlePath = path.resolve(__dirname, '..', 'dist', 'extension.js');
+const ext = require(bundlePath);
+try {
+  ext.activate(context);
+  console.log('activate() returned without throwing');
+} catch (e) {
+  console.log('activate() THREW:', (e && e.stack) || e);
+  process.exitCode = 1;
 }
-
-console.log('SMOKE TEST PASSED');
+setTimeout(() => {
+  const cmds = registered.filter((r) => r.startsWith('cmd:'));
+  console.log('registered commands:', cmds.length);
+  const need = [
+    'cmd:kiroMcpSwitcher.switchProfile',
+    'cmd:kiroMcpSwitcher.applyPreset',
+    'cmd:kiroMcpSwitcher.savePresetFromCurrent',
+    'cmd:kiroMcpSwitcher.restoreSnapshot',
+  ];
+  const missing = need.filter((n) => !registered.includes(n));
+  console.log('has all key commands:', missing.length === 0, missing.length ? missing : '');
+  if (missing.length) process.exitCode = 1;
+}, 100);

@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import { listServers, getTarget } from './mcpConfig';
 import { getProfiles, activeProfileName } from './profiles';
+import { listPresets, activePresetName } from './configPresets';
 
 type Node =
-  | { kind: 'category'; id: 'profiles' | 'servers'; label: string }
+  | { kind: 'category'; id: 'profiles' | 'servers' | 'presets'; label: string }
   | { kind: 'profile'; name: string; active: boolean }
   | { kind: 'server'; name: string; enabled: boolean }
+  | { kind: 'preset'; name: string; active: boolean }
   | { kind: 'message'; label: string };
 
 export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
@@ -21,8 +23,10 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
       case 'category': {
         const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.Expanded);
         item.contextValue = `category:${node.id}`;
-        item.iconPath = new vscode.ThemeIcon(node.id === 'profiles' ? 'layers' : 'server-process');
-        if (node.id === 'servers') {
+        const icon =
+          node.id === 'profiles' ? 'layers' : node.id === 'servers' ? 'server-process' : 'files';
+        item.iconPath = new vscode.ThemeIcon(icon);
+        if (node.id !== 'profiles') {
           item.description = getTarget();
         }
         return item;
@@ -55,6 +59,20 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
         };
         return item;
       }
+      case 'preset': {
+        const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.None);
+        item.contextValue = 'preset';
+        item.iconPath = new vscode.ThemeIcon(node.active ? 'pass-filled' : 'file-code');
+        if (node.active) {
+          item.description = 'active';
+        }
+        item.command = {
+          command: 'kiroMcpSwitcher.applyPreset',
+          title: 'Apply',
+          arguments: [node.name],
+        };
+        return item;
+      }
       case 'message': {
         const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.None);
         item.contextValue = 'message';
@@ -66,9 +84,18 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
   async getChildren(node?: Node): Promise<Node[]> {
     if (!node) {
       return [
+        { kind: 'category', id: 'presets', label: 'Config Presets' },
         { kind: 'category', id: 'profiles', label: 'Profiles' },
         { kind: 'category', id: 'servers', label: 'Servers' },
       ];
+    }
+    if (node.kind === 'category' && node.id === 'presets') {
+      const names = await listPresets();
+      if (names.length === 0) {
+        return [{ kind: 'message', label: 'No presets yet — use "Save Current as Preset"' }];
+      }
+      const active = await activePresetName();
+      return names.map((name) => ({ kind: 'preset', name, active: name === active }));
     }
     if (node.kind === 'category' && node.id === 'profiles') {
       const names = Object.keys(getProfiles());

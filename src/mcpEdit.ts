@@ -1,0 +1,50 @@
+import * as jsonc from 'jsonc-parser';
+
+const FMT: jsonc.ModificationOptions = {
+  formattingOptions: { insertSpaces: true, tabSize: 2 },
+};
+
+/** Parse a JSON/JSONC document and return its top-level object (tolerant of comments). */
+export function parseRoot(text: string): Record<string, unknown> {
+  const root = jsonc.parse(text, [], { allowTrailingComma: true });
+  return root && typeof root === 'object' ? (root as Record<string, unknown>) : {};
+}
+
+/** Extract the `mcpServers` object from a document. */
+export function extractMcpServers(text: string): Record<string, unknown> {
+  const s = parseRoot(text).mcpServers;
+  return s && typeof s === 'object' ? (s as Record<string, unknown>) : {};
+}
+
+/**
+ * Replace ONLY the `mcpServers` block with the given object, preserving other
+ * top-level keys and any comments outside the mcpServers block. This is the
+ * "full swap" used by config presets: after this, Kiro sees exactly the servers
+ * in `servers` and nothing else.
+ */
+export function replaceMcpServers(text: string, servers: Record<string, unknown>): string {
+  const edits = jsonc.modify(text, ['mcpServers'], servers, FMT);
+  return jsonc.applyEdits(text, edits);
+}
+
+/** Build a fresh preset document body wrapping a servers object. */
+export function presetDocument(servers: Record<string, unknown>): string {
+  return JSON.stringify({ mcpServers: servers }, null, 2) + '\n';
+}
+
+/** Order-independent deep equality for comparing server blocks (to detect the active preset). */
+export function serversEqual(a: unknown, b: unknown): boolean {
+  return canonical(a) === canonical(b);
+}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return '[' + value.map(canonical).join(',') + ']';
+  }
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonical(obj[k])).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}

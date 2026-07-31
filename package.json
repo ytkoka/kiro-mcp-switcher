@@ -2,7 +2,7 @@
   "name": "kiro-mcp-switcher",
   "displayName": "Kiro MCP Switcher",
   "description": "Toggle and switch profiles of MCP servers in Kiro's mcp.json without hand-editing JSON.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "ytkoka",
   "author": {
     "name": "ytkoka"
@@ -107,6 +107,48 @@
         "title": "Refresh",
         "category": "Kiro MCP",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroMcpSwitcher.applyPreset",
+        "title": "Apply Config Preset",
+        "category": "Kiro MCP",
+        "icon": "$(play)"
+      },
+      {
+        "command": "kiroMcpSwitcher.savePresetFromCurrent",
+        "title": "Save Current as Preset",
+        "category": "Kiro MCP",
+        "icon": "$(save)"
+      },
+      {
+        "command": "kiroMcpSwitcher.newEmptyPreset",
+        "title": "New Empty Preset",
+        "category": "Kiro MCP",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "kiroMcpSwitcher.duplicatePreset",
+        "title": "Duplicate Preset",
+        "category": "Kiro MCP",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "kiroMcpSwitcher.deletePreset",
+        "title": "Delete Preset",
+        "category": "Kiro MCP",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "kiroMcpSwitcher.openPreset",
+        "title": "Open Preset File",
+        "category": "Kiro MCP",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "kiroMcpSwitcher.restoreSnapshot",
+        "title": "Restore Last Snapshot",
+        "category": "Kiro MCP",
+        "icon": "$(discard)"
       }
     ],
     "menus": {
@@ -132,9 +174,24 @@
           "group": "navigation@4"
         },
         {
+          "command": "kiroMcpSwitcher.savePresetFromCurrent",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "navigation@0"
+        },
+        {
           "command": "kiroMcpSwitcher.openConfig",
           "when": "view == kiroMcpSwitcher.view",
           "group": "overflow@1"
+        },
+        {
+          "command": "kiroMcpSwitcher.newEmptyPreset",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "overflow@2"
+        },
+        {
+          "command": "kiroMcpSwitcher.restoreSnapshot",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "overflow@3"
         }
       ],
       "view/item/context": [
@@ -152,6 +209,26 @@
           "command": "kiroMcpSwitcher.toggleServer",
           "when": "view == kiroMcpSwitcher.view && viewItem =~ /^server:/",
           "group": "inline"
+        },
+        {
+          "command": "kiroMcpSwitcher.applyPreset",
+          "when": "view == kiroMcpSwitcher.view && viewItem == preset",
+          "group": "inline"
+        },
+        {
+          "command": "kiroMcpSwitcher.openPreset",
+          "when": "view == kiroMcpSwitcher.view && viewItem == preset",
+          "group": "1_modify@1"
+        },
+        {
+          "command": "kiroMcpSwitcher.duplicatePreset",
+          "when": "view == kiroMcpSwitcher.view && viewItem == preset",
+          "group": "1_modify@2"
+        },
+        {
+          "command": "kiroMcpSwitcher.deletePreset",
+          "when": "view == kiroMcpSwitcher.view && viewItem == preset",
+          "group": "1_modify@3"
         }
       ],
       "commandPalette": [
@@ -181,6 +258,11 @@
           "default": "workspace",
           "description": "Which mcp.json the switcher reads from and writes to."
         },
+        "kiroMcpSwitcher.reloadWindowOnApplyPreset": {
+          "type": "boolean",
+          "default": false,
+          "description": "After applying a config preset, automatically reload the window so Kiro re-reads mcp.json. Useful for a fast test loop; leave off to be prompted instead."
+        },
         "kiroMcpSwitcher.stateField": {
           "type": "string",
           "enum": [
@@ -209,10 +291,11 @@
     "watch": "node esbuild.js --watch",
     "package": "node esbuild.js --production",
     "check-types": "tsc --noEmit",
+    "smoke": "node scripts/smoke-activate.js",
+    "test": "node --import tsx --test test/*.test.ts",
     "vscode:prepublish": "npm run package",
     "vsix": "vsce package",
-    "publish:ovsx": "ovsx publish",
-    "smoke": "node scripts/smoke-activate.js"
+    "publish:ovsx": "ovsx publish"
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1"
@@ -223,6 +306,7 @@
     "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.23.1",
     "ovsx": "^0.9.5",
+    "tsx": "^4.23.1",
     "typescript": "^5.5.4"
   }
 }
