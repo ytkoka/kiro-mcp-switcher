@@ -1,63 +1,48 @@
 # Kiro MCP Switcher
 
-Switch between named **Config Presets** (complete `mcpServers` definitions) and inspect the
-**Active Config** currently in effect, without hand-editing `mcp.json`. Built for
-[Kiro](https://kiro.dev), but works in any Code‑OSS based editor (Kiro, Cursor, Windsurf,
-VSCodium, …) since it just edits Kiro's config file.
+A Kiro extension for **swapping the entire `mcpServers` configuration in `mcp.json`** and testing
+each configuration in isolation — not just turning individual servers on and off.
 
-Kiro watches `mcp.json` and reconciles running servers on save, so changes apply live — no restart.
+Kiro's built-in MCP Servers view already lets you enable/disable servers. But a `disabled` server
+still exists in the config, so Kiro is aware of it. When you want Kiro to behave **as if only one
+specific configuration were present** — for example, to test a single MCP endpoint on its own, or
+to compare how Kiro behaves under different full configurations — toggling isn't enough. This tool
+keeps named **config presets**, each a complete `mcpServers` definition, and applying one replaces
+the `mcpServers` block wholesale so Kiro sees exactly that preset and nothing else.
+
+It also gives you an **Active Config** view to inspect what's actually in `mcp.json` right now
+(with secrets masked), and snapshots `mcp.json` before each swap so you can roll back.
+
+Built for [Kiro](https://kiro.dev), but works in any Code-OSS based editor since it just edits
+Kiro's config file. Kiro re-reads `mcp.json` on window reload, so after applying a preset the
+extension offers a one-click reload.
+
+## When to use this
+
+Good fit:
+
+- **Testing one MCP endpoint in true isolation** — swap in a preset that defines only that server,
+  so nothing else is present in the config while you test Kiro's behavior.
+- **A/B testing full configurations** — keep several complete `mcpServers` setups as presets and
+  switch between them, with snapshot/restore for safe experimentation.
+- **Inspecting the live config** — see the actual servers and their parameters, with sensitive
+  values hidden by default.
+
+You probably don't need this if you only want to turn a couple of servers on/off (use Kiro's
+built-in MCP Servers view) or give each project a fixed set of servers (use a per-workspace
+`mcp.json`). This tool is aimed at the "swap the whole config to test it" workflow that those
+approaches don't cover.
 
 ## What it does
 
-- **Sidebar view** ("MCP Switcher" in the activity bar) listing your Config Presets and the
-  Active Config.
-- **Config Presets**: named, complete `mcpServers` definitions you can swap in wholesale — see
-  below.
-- **Active Config view**: expand any server in the current `mcp.json` to inspect its full entry
-  (`command`, `args`, `url`, `headers`, `env`, `disabled`, …), read-only.
-- **Sensitive value masking**: likely-secret values (tokens, keys, passwords, …) are hidden by
-  default; toggle with the eye icon.
-- **Status bar item** showing the active preset and target, click to apply a preset.
-- **Workspace vs. User target**, selectable in settings (see below).
+- **Config Presets** — named presets stored as files under `<settings>/mcp-presets/`, each a full
+  `mcpServers` definition. Applying one replaces the mcp.json `mcpServers` block wholesale (other
+  top-level keys and comments preserved). Ideal for testing a single endpoint (or set) in isolation.
+- **Active Config view** — expand each server in the current mcp.json to inspect its full entry
+  (`command`, `args`, `url`, `headers`, `env`, `disabled`, …). Read-only.
+- **Automatic snapshots** — mcp.json is snapshotted before each apply; restore with one command.
+- **Workspace / User target**, selectable in settings.
 
-## Config presets (full swap)
-
-Each preset is a complete `mcpServers` object stored as its own file under
-`<settings>/mcp-presets/<name>.json` (next to the target `mcp.json`, so it follows the
-`workspace`/`user` target setting).
-
-Applying a preset replaces the **entire `mcpServers` block** in `mcp.json` with the preset's
-servers — nothing else survives the swap. Every other top-level key and every comment in
-`mcp.json` outside of `mcpServers` is left untouched. This makes it easy to get Kiro to see
-*only* one endpoint (or one specific set) for isolated behavior testing.
-
-- **Create**: capture the current `mcp.json` as a preset ("Save Current as Preset"), start from
-  an empty preset and edit it by hand ("New Empty Preset"), or copy an existing one ("Duplicate
-  Preset").
-- **Snapshots**: applying a preset automatically snapshots the current `mcp.json` first (kept
-  under `<settings>/mcp-snapshots/`, last 10 retained). Use "Restore Last Snapshot" to undo the
-  most recent apply.
-- **Reload**: Kiro has no public command to force an MCP reload after an external file write, so
-  after applying a preset the extension offers a one-click **Reload Window**. Set
-  `kiroMcpSwitcher.reloadWindowOnApplyPreset` to `true` to reload automatically instead of being
-  prompted, or just use Kiro's own MCP panel reload if you'd rather not reload the whole window.
-
-Preset files can contain anything a normal `mcpServers` entry can, including tokens or other
-secrets for the servers they describe. If any of your presets hold sensitive values, keep
-`mcp-presets/` (and `mcp-snapshots/`) out of version control, the same way you'd treat `mcp.json`
-itself.
-
-## Active Config view (expand & mask)
-
-The "Active Config" section of the sidebar mirrors exactly what's in the target `mcp.json` right
-now — one entry per server, expandable into its full definition (`command`, `args`, `url`,
-`headers`, `env`, `disabled`, and anything else present). It's read-only: use it to verify what's
-actually live, not to edit.
-
-Keys that look like they hold secrets (`Authorization`, `token`, `apiKey`, `clientSecret`,
-`password`, …, matched case-insensitively, anywhere nested under a server) are masked as `••••••`
-by default, so the tree is safe to leave open or screenshot. Toggle visibility with the eye icon
-in the view title, or set `kiroMcpSwitcher.maskSensitiveValues` to `false` to always show them.
 
 ## Target: workspace or user
 
@@ -74,10 +59,11 @@ command **Kiro MCP: Select Target (Workspace / User)**. If no folder is open, us
 ## Settings
 
 - `kiroMcpSwitcher.target` — `workspace` | `user` (default `workspace`).
-- `kiroMcpSwitcher.reloadWindowOnApplyPreset` — boolean (default `false`). Automatically reload
-  the window after applying a preset instead of being prompted.
-- `kiroMcpSwitcher.maskSensitiveValues` — boolean (default `true`). Hide likely-secret values in
-  the Active Config view.
+- `kiroMcpSwitcher.reloadWindowOnApplyPreset` — reload the window automatically after applying a
+  preset (default `false`; you're prompted otherwise).
+- `kiroMcpSwitcher.maskSensitiveValues` — hide likely-secret values in the Active Config view
+  (default `true`). Toggle live with the eye icon in the view title.
+
 
 ## Commands
 
@@ -94,6 +80,31 @@ All under the **Kiro MCP** category:
 - Select Target (Workspace / User)
 - Open mcp.json
 - Refresh
+
+
+## Config presets (full swap)
+
+A **config preset** is a named, complete `mcpServers` definition stored as a file under
+`<settings>/mcp-presets/`. Applying a preset replaces the mcp.json `mcpServers` block wholesale
+(other top-level keys and comments are preserved), so Kiro sees exactly that preset's servers —
+useful for testing a single endpoint (or a specific set) in isolation, which the enable/disable
+toggle can't do (disabled servers still exist in the config).
+
+- Create a preset by **Save Current as Preset**, **New Empty Preset** (opens for editing), or
+  **Duplicate Preset**.
+- **Apply** swaps the block. mcp.json is **snapshotted first**; use **Restore Last Snapshot**
+  to roll back.
+- After apply you're offered a one-click **Reload Window** so Kiro re-reads mcp.json; set
+  `kiroMcpSwitcher.reloadWindowOnApplyPreset` to do it automatically for a fast test loop.
+- Presets follow the current target (workspace or user). Keep preset files out of version
+  control if they contain anything sensitive.
+
+## Active Config view
+
+Expand a server under **Active Config** to see its actual mcp.json entry as a tree — handy for
+confirming what a preset applied. Values under sensitive keys (`Authorization`, `token`, `key`,
+`secret`, `password`, …) are masked (`••••••`) by default; click the eye icon in the view title
+to reveal them for the current session.
 
 ## Build
 
@@ -117,5 +128,4 @@ in `package.json`, create a namespace/token at <https://open-vsx.org>, then
 
 - Edits are surgical (via `jsonc-parser`), so comments and formatting in `mcp.json` are preserved.
 - Multi-root workspaces: the first workspace folder is used for the `workspace` target.
-- Upgrading from a pre-0.2.1 version: the old Profiles feature and its
-  `kiroMcpSwitcher.profiles` setting are removed automatically on first activation.
+- Independent community tool — not affiliated with AWS or the Kiro team.
