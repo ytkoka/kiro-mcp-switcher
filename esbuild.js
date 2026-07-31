@@ -12,6 +12,10 @@ async function main() {
     format: 'cjs',
     platform: 'node',
     target: 'node18',
+    // Prefer the ESM entry of deps (e.g. jsonc-parser) so esbuild can statically
+    // bundle them. Their UMD/CJS entry uses a local `require` param that defeats
+    // bundling and leaves a broken runtime require like `./impl/format`.
+    mainFields: ['module', 'main'],
     sourcemap: !production,
     minify: production,
     logLevel: 'info',
