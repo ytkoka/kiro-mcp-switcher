@@ -108,10 +108,10 @@ setTimeout(() => {
   const cmds = registered.filter((r) => r.startsWith('cmd:'));
   console.log('registered commands:', cmds.length);
   const need = [
-    'cmd:kiroMcpSwitcher.switchProfile',
     'cmd:kiroMcpSwitcher.applyPreset',
     'cmd:kiroMcpSwitcher.savePresetFromCurrent',
     'cmd:kiroMcpSwitcher.restoreSnapshot',
+    'cmd:kiroMcpSwitcher.toggleMask',
   ];
   const missing = need.filter((n) => !registered.includes(n));
   console.log('has all key commands:', missing.length === 0, missing.length ? missing : '');

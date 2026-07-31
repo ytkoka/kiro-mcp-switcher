@@ -1,8 +1,8 @@
 {
   "name": "kiro-mcp-switcher",
   "displayName": "Kiro MCP Switcher",
-  "description": "Toggle and switch profiles of MCP servers in Kiro's mcp.json without hand-editing JSON.",
-  "version": "0.2.0",
+  "description": "Switch Kiro MCP config presets (full mcpServers swap) and inspect the active mcp.json, without hand-editing JSON.",
+  "version": "0.2.1",
   "publisher": "ytkoka",
   "author": {
     "name": "ytkoka"
@@ -27,7 +27,7 @@
     "kiro",
     "mcp",
     "model context protocol",
-    "profile",
+    "preset",
     "switcher"
   ],
   "main": "./dist/extension.js",
@@ -55,40 +55,10 @@
     },
     "commands": [
       {
-        "command": "kiroMcpSwitcher.switchProfile",
-        "title": "Switch Profile",
+        "command": "kiroMcpSwitcher.refresh",
+        "title": "Refresh",
         "category": "Kiro MCP",
-        "icon": "$(layers)"
-      },
-      {
-        "command": "kiroMcpSwitcher.applyProfile",
-        "title": "Apply Profile",
-        "category": "Kiro MCP",
-        "icon": "$(play)"
-      },
-      {
-        "command": "kiroMcpSwitcher.toggleServer",
-        "title": "Toggle Server",
-        "category": "Kiro MCP",
-        "icon": "$(circle-large-outline)"
-      },
-      {
-        "command": "kiroMcpSwitcher.toggleServers",
-        "title": "Toggle Servers (multi-select)",
-        "category": "Kiro MCP",
-        "icon": "$(checklist)"
-      },
-      {
-        "command": "kiroMcpSwitcher.saveProfile",
-        "title": "Save Current as Profile",
-        "category": "Kiro MCP",
-        "icon": "$(save)"
-      },
-      {
-        "command": "kiroMcpSwitcher.deleteProfile",
-        "title": "Delete Profile",
-        "category": "Kiro MCP",
-        "icon": "$(trash)"
+        "icon": "$(refresh)"
       },
       {
         "command": "kiroMcpSwitcher.selectTarget",
@@ -103,10 +73,10 @@
         "icon": "$(go-to-file)"
       },
       {
-        "command": "kiroMcpSwitcher.refresh",
-        "title": "Refresh",
+        "command": "kiroMcpSwitcher.toggleMask",
+        "title": "Toggle Sensitive Values (show/hide)",
         "category": "Kiro MCP",
-        "icon": "$(refresh)"
+        "icon": "$(eye)"
       },
       {
         "command": "kiroMcpSwitcher.applyPreset",
@@ -154,29 +124,24 @@
     "menus": {
       "view/title": [
         {
-          "command": "kiroMcpSwitcher.switchProfile",
+          "command": "kiroMcpSwitcher.savePresetFromCurrent",
+          "when": "view == kiroMcpSwitcher.view",
+          "group": "navigation@0"
+        },
+        {
+          "command": "kiroMcpSwitcher.toggleMask",
           "when": "view == kiroMcpSwitcher.view",
           "group": "navigation@1"
         },
         {
-          "command": "kiroMcpSwitcher.saveProfile",
+          "command": "kiroMcpSwitcher.selectTarget",
           "when": "view == kiroMcpSwitcher.view",
           "group": "navigation@2"
         },
         {
-          "command": "kiroMcpSwitcher.selectTarget",
-          "when": "view == kiroMcpSwitcher.view",
-          "group": "navigation@3"
-        },
-        {
           "command": "kiroMcpSwitcher.refresh",
           "when": "view == kiroMcpSwitcher.view",
-          "group": "navigation@4"
-        },
-        {
-          "command": "kiroMcpSwitcher.savePresetFromCurrent",
-          "when": "view == kiroMcpSwitcher.view",
-          "group": "navigation@0"
+          "group": "navigation@3"
         },
         {
           "command": "kiroMcpSwitcher.openConfig",
@@ -196,21 +161,6 @@
       ],
       "view/item/context": [
         {
-          "command": "kiroMcpSwitcher.applyProfile",
-          "when": "view == kiroMcpSwitcher.view && viewItem == profile",
-          "group": "inline"
-        },
-        {
-          "command": "kiroMcpSwitcher.deleteProfile",
-          "when": "view == kiroMcpSwitcher.view && viewItem == profile",
-          "group": "1_modify"
-        },
-        {
-          "command": "kiroMcpSwitcher.toggleServer",
-          "when": "view == kiroMcpSwitcher.view && viewItem =~ /^server:/",
-          "group": "inline"
-        },
-        {
           "command": "kiroMcpSwitcher.applyPreset",
           "when": "view == kiroMcpSwitcher.view && viewItem == preset",
           "group": "inline"
@@ -229,16 +179,6 @@
           "command": "kiroMcpSwitcher.deletePreset",
           "when": "view == kiroMcpSwitcher.view && viewItem == preset",
           "group": "1_modify@3"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "kiroMcpSwitcher.applyProfile",
-          "when": "false"
-        },
-        {
-          "command": "kiroMcpSwitcher.toggleServer",
-          "when": "false"
         }
       ]
     },
@@ -263,25 +203,10 @@
           "default": false,
           "description": "After applying a config preset, automatically reload the window so Kiro re-reads mcp.json. Useful for a fast test loop; leave off to be prompted instead."
         },
-        "kiroMcpSwitcher.stateField": {
-          "type": "string",
-          "enum": [
-            "disabled",
-            "enabled"
-          ],
-          "default": "disabled",
-          "description": "Which per-server field controls on/off. Kiro's documented field is `disabled`; use `enabled` only if your config uses that key instead."
-        },
-        "kiroMcpSwitcher.profiles": {
-          "type": "object",
-          "default": {},
-          "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "markdownDescription": "Named profiles. Each profile is a list of MCP server names that should be **enabled**; every other server in mcp.json is disabled when the profile is applied.\n\nExample:\n```json\n{\n  \"frontend\": [\"fetch\", \"playwright\"],\n  \"aws\": [\"aws-docs\", \"aws-knowledge\"]\n}\n```"
+        "kiroMcpSwitcher.maskSensitiveValues": {
+          "type": "boolean",
+          "default": true,
+          "description": "In the Active Config view, hide likely-secret values (Authorization, token, key, secret, password, etc.). Toggle with the eye icon in the view title."
         }
       }
     }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1
+
+- Focus on Config Presets; remove the old Profiles feature (enable/disable combos) and clean up
+  the obsolete `kiroMcpSwitcher.profiles` setting on activation.
+- Replace the "Servers" list with an "Active Config" view: expand each server to inspect its full
+  mcp.json entry (command, args, url, headers, env, ...).
+- Mask sensitive values by default (Authorization, token, key, secret, password, ...); toggle with
+  the eye icon or `kiroMcpSwitcher.maskSensitiveValues`.
+
 ## 0.2.0
 
 - Add Config Presets: named presets, each a complete `mcpServers` definition stored as files

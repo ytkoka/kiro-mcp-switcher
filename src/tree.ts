@@ -1,14 +1,26 @@
 import * as vscode from 'vscode';
-import { listServers, getTarget } from './mcpConfig';
-import { getProfiles, activeProfileName } from './profiles';
+import { getTarget, readMcpServers } from './mcpConfig';
 import { listPresets, activePresetName } from './configPresets';
+import {
+  childEntries,
+  isLeaf,
+  isSensitiveKey,
+  leafDisplay,
+  branchHint,
+} from './configView';
 
 type Node =
-  | { kind: 'category'; id: 'profiles' | 'servers' | 'presets'; label: string }
-  | { kind: 'profile'; name: string; active: boolean }
-  | { kind: 'server'; name: string; enabled: boolean }
+  | { kind: 'category'; id: 'presets' | 'active'; label: string }
   | { kind: 'preset'; name: string; active: boolean }
+  | { kind: 'configserver'; name: string; value: unknown }
+  | { kind: 'param'; key: string; value: unknown; sensitive: boolean }
   | { kind: 'message'; label: string };
+
+function maskEnabled(): boolean {
+  return vscode.workspace
+    .getConfiguration('kiroMcpSwitcher')
+    .get<boolean>('maskSensitiveValues', true);
+}
 
 export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
   private readonly _onDidChange = new vscode.EventEmitter<Node | undefined>();
@@ -23,40 +35,8 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
       case 'category': {
         const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.Expanded);
         item.contextValue = `category:${node.id}`;
-        const icon =
-          node.id === 'profiles' ? 'layers' : node.id === 'servers' ? 'server-process' : 'files';
-        item.iconPath = new vscode.ThemeIcon(icon);
-        if (node.id !== 'profiles') {
-          item.description = getTarget();
-        }
-        return item;
-      }
-      case 'profile': {
-        const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.None);
-        item.contextValue = 'profile';
-        item.iconPath = new vscode.ThemeIcon(node.active ? 'pass-filled' : 'circle-large-outline');
-        if (node.active) {
-          item.description = 'active';
-        }
-        item.command = {
-          command: 'kiroMcpSwitcher.applyProfile',
-          title: 'Apply',
-          arguments: [node.name],
-        };
-        return item;
-      }
-      case 'server': {
-        const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.None);
-        item.contextValue = node.enabled ? 'server:enabled' : 'server:disabled';
-        item.iconPath = new vscode.ThemeIcon(node.enabled ? 'check' : 'circle-slash');
-        if (!node.enabled) {
-          item.description = 'disabled';
-        }
-        item.command = {
-          command: 'kiroMcpSwitcher.toggleServer',
-          title: 'Toggle',
-          arguments: [node.name],
-        };
+        item.iconPath = new vscode.ThemeIcon(node.id === 'presets' ? 'files' : 'server-process');
+        item.description = getTarget();
         return item;
       }
       case 'preset': {
@@ -73,6 +53,30 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
         };
         return item;
       }
+      case 'configserver': {
+        const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.Collapsed);
+        item.contextValue = 'configserver';
+        item.iconPath = new vscode.ThemeIcon('server');
+        return item;
+      }
+      case 'param': {
+        const leaf = isLeaf(node.value);
+        const item = new vscode.TreeItem(
+          node.key,
+          leaf ? vscode.TreeItemCollapsibleState.None : vscode.TreeItemCollapsibleState.Collapsed,
+        );
+        item.contextValue = 'param';
+        if (leaf) {
+          item.description = leafDisplay(node.value, node.sensitive, maskEnabled());
+          if (node.sensitive && maskEnabled()) {
+            item.iconPath = new vscode.ThemeIcon('lock');
+            item.tooltip = 'Sensitive value hidden. Toggle "Show sensitive values" to reveal.';
+          }
+        } else {
+          item.description = branchHint(node.value);
+        }
+        return item;
+      }
       case 'message': {
         const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.None);
         item.contextValue = 'message';
@@ -85,8 +89,7 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
     if (!node) {
       return [
         { kind: 'category', id: 'presets', label: 'Config Presets' },
-        { kind: 'category', id: 'profiles', label: 'Profiles' },
-        { kind: 'category', id: 'servers', label: 'Servers' },
+        { kind: 'category', id: 'active', label: 'Active Config' },
       ];
     }
     if (node.kind === 'category' && node.id === 'presets') {
@@ -97,20 +100,30 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
       const active = await activePresetName();
       return names.map((name) => ({ kind: 'preset', name, active: name === active }));
     }
-    if (node.kind === 'category' && node.id === 'profiles') {
-      const names = Object.keys(getProfiles());
+    if (node.kind === 'category' && node.id === 'active') {
+      const servers = await readMcpServers();
+      const names = Object.keys(servers);
       if (names.length === 0) {
-        return [{ kind: 'message', label: 'No profiles yet — use "Save Current as Profile"' }];
+        return [{ kind: 'message', label: 'No servers in the current mcp.json' }];
       }
-      const active = await activeProfileName();
-      return names.map((name) => ({ kind: 'profile', name, active: name === active }));
+      return names.map((name) => ({ kind: 'configserver', name, value: servers[name] }));
     }
-    if (node.kind === 'category' && node.id === 'servers') {
-      const servers = await listServers();
-      if (servers.length === 0) {
-        return [{ kind: 'message', label: 'No servers found in mcp.json' }];
-      }
-      return servers.map((s) => ({ kind: 'server', name: s.name, enabled: s.enabled }));
+    if (node.kind === 'configserver') {
+      return childEntries(node.value).map((c) => ({
+        kind: 'param',
+        key: c.key,
+        value: c.value,
+        sensitive: isSensitiveKey(c.key),
+      }));
+    }
+    if (node.kind === 'param' && !isLeaf(node.value)) {
+      return childEntries(node.value).map((c) => ({
+        kind: 'param',
+        key: c.key,
+        value: c.value,
+        // sensitivity propagates into nested subtrees
+        sensitive: node.sensitive || isSensitiveKey(c.key),
+      }));
     }
     return [];
   }

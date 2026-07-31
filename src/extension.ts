@@ -1,20 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import {
-  getTarget,
-  Target,
-  resolveMcpPath,
-  listServers,
-  setServersEnabled,
-  ensureMcpFile,
-} from './mcpConfig';
-import {
-  getProfiles,
-  saveCurrentAsProfile,
-  deleteProfile,
-  applyProfile,
-  activeProfileName,
-} from './profiles';
+import { getTarget, Target, resolveMcpPath, ensureMcpFile } from './mcpConfig';
 import { McpTreeProvider } from './tree';
 import {
   listPresets,
@@ -26,6 +12,7 @@ import {
   restoreLastSnapshot,
   hasSnapshot,
   presetFilePath,
+  activePresetName,
 } from './configPresets';
 
 let statusBar: vscode.StatusBarItem;
@@ -37,7 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(vscode.window.registerTreeDataProvider('kiroMcpSwitcher.view', tree));
 
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBar.command = 'kiroMcpSwitcher.switchProfile';
+  statusBar.command = 'kiroMcpSwitcher.applyPreset';
   context.subscriptions.push(statusBar);
 
   const refresh = async (): Promise<void> => {
@@ -47,46 +34,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('kiroMcpSwitcher.refresh', refresh),
-    vscode.commands.registerCommand('kiroMcpSwitcher.switchProfile', () => switchProfile(refresh)),
-    vscode.commands.registerCommand('kiroMcpSwitcher.applyProfile', async (arg?: unknown) => {
-      const name = resolveName(arg);
-      if (!name) {
-        return switchProfile(refresh);
-      }
-      await guard(async () => {
-        await applyProfile(name);
-        await refresh();
-        vscode.window.setStatusBarMessage(`MCP profile "${name}" applied`, 2000);
-      });
-    }),
-    vscode.commands.registerCommand('kiroMcpSwitcher.toggleServer', async (arg?: unknown) => {
-      const name = resolveName(arg);
-      if (!name) {
-        return toggleServersQuickPick(refresh);
-      }
-      await guard(async () => {
-        const s = (await listServers()).find((x) => x.name === name);
-        if (!s) {
-          return;
-        }
-        await setServersEnabled([{ name, enabled: !s.enabled }]);
-        await refresh();
-      });
-    }),
-    vscode.commands.registerCommand('kiroMcpSwitcher.toggleServers', () =>
-      toggleServersQuickPick(refresh),
-    ),
-    vscode.commands.registerCommand('kiroMcpSwitcher.saveProfile', () => saveProfile(refresh)),
-    vscode.commands.registerCommand('kiroMcpSwitcher.deleteProfile', async (arg?: unknown) => {
-      const target = resolveName(arg) ?? (await pickProfile('Select a profile to delete'));
-      if (!target) {
-        return;
-      }
-      await deleteProfile(target);
-      await refresh();
-    }),
     vscode.commands.registerCommand('kiroMcpSwitcher.selectTarget', () => selectTarget(refresh)),
     vscode.commands.registerCommand('kiroMcpSwitcher.openConfig', openConfig),
+    vscode.commands.registerCommand('kiroMcpSwitcher.toggleMask', () => toggleMask(refresh)),
     vscode.commands.registerCommand('kiroMcpSwitcher.applyPreset', (arg?: unknown) =>
       applyPresetCmd(refresh, resolveName(arg)),
     ),
@@ -117,15 +67,12 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  void cleanupLegacyProfiles();
   setupWatcher(context);
   void refresh();
 }
 
-/**
- * Tree menu commands (inline/context buttons) receive the tree element object,
- * while the status bar, palette, and item.command pass a plain name string.
- * Normalize both to the name string.
- */
+/** Tree menu commands pass the element object; status bar/palette pass a name string. */
 function resolveName(arg: unknown): string | undefined {
   if (typeof arg === 'string') {
     return arg;
@@ -173,82 +120,16 @@ async function updateStatusBar(): Promise<void> {
   const target = getTarget();
   let label = 'custom';
   try {
-    const active = await activeProfileName();
+    const active = await activePresetName();
     if (active) {
       label = active;
     }
   } catch {
-    // ignore — status bar is best-effort
+    // best-effort
   }
   statusBar.text = `$(server) MCP: ${label} (${target})`;
-  statusBar.tooltip = `Kiro MCP Switcher\nTarget: ${target}\nClick to switch profile`;
+  statusBar.tooltip = `Kiro MCP Switcher\nTarget: ${target}\nClick to apply a config preset`;
   statusBar.show();
-}
-
-async function switchProfile(refresh: () => Promise<void>): Promise<void> {
-  const name = await pickProfile('Switch MCP profile');
-  if (!name) {
-    return;
-  }
-  await guard(async () => {
-    await applyProfile(name);
-    await refresh();
-    vscode.window.setStatusBarMessage(`MCP profile "${name}" applied`, 2000);
-  });
-}
-
-async function pickProfile(placeHolder: string): Promise<string | undefined> {
-  const profiles = getProfiles();
-  const names = Object.keys(profiles);
-  if (names.length === 0) {
-    vscode.window.showInformationMessage(
-      'No profiles defined yet. Use "Kiro MCP: Save Current as Profile".',
-    );
-    return undefined;
-  }
-  const active = await activeProfileName();
-  const items = names.map((n) => ({
-    label: n === active ? `$(pass-filled) ${n}` : n,
-    description: (profiles[n] ?? []).join(', ') || '(no servers enabled)',
-    name: n,
-  }));
-  const pick = await vscode.window.showQuickPick(items, { placeHolder });
-  return pick?.name;
-}
-
-async function toggleServersQuickPick(refresh: () => Promise<void>): Promise<void> {
-  const servers = await listServers();
-  if (servers.length === 0) {
-    vscode.window.showInformationMessage('No MCP servers found in mcp.json.');
-    return;
-  }
-  const items = servers.map((s) => ({ label: s.name, picked: s.enabled, name: s.name }));
-  const picks = await vscode.window.showQuickPick(items, {
-    canPickMany: true,
-    placeHolder: 'Check the servers that should be enabled',
-  });
-  if (!picks) {
-    return; // cancelled
-  }
-  const enabledSet = new Set(picks.map((p) => p.name));
-  const updates = servers.map((s) => ({ name: s.name, enabled: enabledSet.has(s.name) }));
-  await guard(async () => {
-    await setServersEnabled(updates);
-    await refresh();
-  });
-}
-
-async function saveProfile(refresh: () => Promise<void>): Promise<void> {
-  const name = await vscode.window.showInputBox({
-    prompt: 'Name for this profile (captures the currently enabled servers)',
-    validateInput: (v) => (v.trim() ? undefined : 'Please enter a name'),
-  });
-  if (!name) {
-    return;
-  }
-  await saveCurrentAsProfile(name.trim());
-  await refresh();
-  vscode.window.setStatusBarMessage(`Saved profile "${name.trim()}"`, 2000);
 }
 
 async function selectTarget(refresh: () => Promise<void>): Promise<void> {
@@ -292,8 +173,15 @@ async function openConfig(): Promise<void> {
   await vscode.window.showTextDocument(doc);
 }
 
-export function deactivate(): void {
-  watcher?.dispose();
+async function toggleMask(refresh: () => Promise<void>): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration('kiroMcpSwitcher');
+  const current = cfg.get<boolean>('maskSensitiveValues', true);
+  await cfg.update('maskSensitiveValues', !current, vscode.ConfigurationTarget.Global);
+  await refresh();
+  vscode.window.setStatusBarMessage(
+    !current ? 'Sensitive values hidden' : 'Sensitive values shown',
+    2000,
+  );
 }
 
 // ---------- config preset commands ----------
@@ -304,8 +192,7 @@ async function pickPreset(placeHolder: string): Promise<string | undefined> {
     vscode.window.showInformationMessage('No presets yet. Use "Save Current as Preset" first.');
     return undefined;
   }
-  const pick = await vscode.window.showQuickPick(names, { placeHolder });
-  return pick;
+  return vscode.window.showQuickPick(names, { placeHolder });
 }
 
 async function offerReload(): Promise<void> {
@@ -317,7 +204,7 @@ async function offerReload(): Promise<void> {
     return;
   }
   const choice = await vscode.window.showInformationMessage(
-    'Preset applied to mcp.json. Reload the window so Kiro re-reads it (or reload the server in Kiro\'s MCP panel).',
+    "Preset applied to mcp.json. Reload the window so Kiro re-reads it (or reload the server in Kiro's MCP panel).",
     'Reload Window',
   );
   if (choice === 'Reload Window') {
@@ -422,7 +309,9 @@ async function openPresetCmd(preset?: string): Promise<void> {
 
 async function restoreSnapshotCmd(refresh: () => Promise<void>): Promise<void> {
   if (!(await hasSnapshot())) {
-    vscode.window.showInformationMessage('No snapshot to restore yet. Snapshots are taken when you apply a preset.');
+    vscode.window.showInformationMessage(
+      'No snapshot to restore yet. Snapshots are taken when you apply a preset.',
+    );
     return;
   }
   const confirm = await vscode.window.showWarningMessage(
@@ -440,4 +329,24 @@ async function restoreSnapshotCmd(refresh: () => Promise<void>): Promise<void> {
       await offerReload();
     }
   });
+}
+
+/** Remove the obsolete `kiroMcpSwitcher.profiles` setting left by pre-0.2.1 versions. */
+async function cleanupLegacyProfiles(): Promise<void> {
+  try {
+    const cfg = vscode.workspace.getConfiguration('kiroMcpSwitcher');
+    const info = cfg.inspect('profiles');
+    if (info?.globalValue !== undefined) {
+      await cfg.update('profiles', undefined, vscode.ConfigurationTarget.Global);
+    }
+    if (info?.workspaceValue !== undefined) {
+      await cfg.update('profiles', undefined, vscode.ConfigurationTarget.Workspace);
+    }
+  } catch {
+    // ignore — cleanup is best-effort
+  }
+}
+
+export function deactivate(): void {
+  watcher?.dispose();
 }
