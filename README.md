@@ -116,16 +116,19 @@ npm run vsix           # produces kiro-mcp-switcher-<version>.vsix
 
 ## Install in Kiro
 
-1. `npm run vsix` to produce the `.vsix`.
-2. In Kiro: Command Palette → **Extensions: Install from VSIX…** → pick the file.
-   (Or `kiro --install-extension kiro-mcp-switcher-<version>.vsix`.)
+The extension is published on the [Open VSX Registry](https://open-vsx.org/extension/ytkoka/kiro-mcp-switcher).
 
-To publish to Open VSX instead (so it installs from the Extensions view): set a real `publisher`
-in `package.json`, create a namespace/token at <https://open-vsx.org>, then
-`npx ovsx publish -p <token>`.
+- **From the Extensions view** (recommended): in Kiro — or any Open VSX based editor such as
+  Cursor, Windsurf, or VSCodium — open Extensions, search for **Kiro MCP Switcher**, and install.
+- **From a VSIX** (offline/manual): run `npm run vsix` to produce a `.vsix`, then in Kiro use
+  Command Palette → **Extensions: Install from VSIX…**, or run
+  `kiro --install-extension kiro-mcp-switcher-<version>.vsix`.
+
+Note: Microsoft's own VS Code uses the VS Code Marketplace by default, not Open VSX, so the
+extension won't appear in its search unless you point it at Open VSX — use the VSIX method there.
 
 ## Notes
 
 - Edits are surgical (via `jsonc-parser`), so comments and formatting in `mcp.json` are preserved.
 - Multi-root workspaces: the first workspace folder is used for the `workspace` target.
-- Independent community tool — not affiliated with AWS or the Kiro team.
+

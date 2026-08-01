@@ -1,13 +1,19 @@
 # Changelog
 
+## 0.2.3
+
+- Docs: update the README Install section for the published extension — install from the
+  Extensions view (Open VSX), with VSIX as the offline/manual alternative.
+
 ## 0.2.1
 
-- Focus on Config Presets; remove the old Profiles feature (enable/disable combos) and clean up
-  the obsolete `kiroMcpSwitcher.profiles` setting on activation.
-- Replace the "Servers" list with an "Active Config" view: expand each server to inspect its full
-  mcp.json entry (command, args, url, headers, env, ...).
-- Mask sensitive values by default (Authorization, token, key, secret, password, ...); toggle with
-  the eye icon or `kiroMcpSwitcher.maskSensitiveValues`.
+- Focus the extension on **Config Presets**. The old **Profiles** feature (enable/disable
+  combinations) has been **removed** — presets cover the switching use case, and the obsolete
+  `kiroMcpSwitcher.profiles` setting is cleaned up automatically on activation.
+- Replace the flat "Servers" list with an **Active Config** view: expand each server in the
+  current mcp.json to inspect its full entry (`command`, `args`, `url`, `headers`, `env`, …).
+- **Sensitive values are masked** by default (Authorization, token, key, secret, password, …);
+  toggle visibility with the eye icon in the view title or `kiroMcpSwitcher.maskSensitiveValues`.
 
 ## 0.2.0
 
@@ -17,23 +23,6 @@
 - Save-current / new-empty / duplicate; automatic pre-apply snapshot with Restore Last Snapshot;
   one-click Window Reload after apply. New "Config Presets" sidebar section.
 
-## 0.1.2
-
-- Fix: ツリーのインライン/コンテキストのボタン（プロファイル Apply、サーバー切替、プロファイル削除）が
-  ツリー要素オブジェクトを受け取って動作しない不具合を修正。ステータスバーの
-  "[object Object]" 表示と、プロファイルが切り替わらない問題を解消した。
-
-## 0.1.1
-
-- Fix: 拡張が起動時に失敗し `command 'kiroMcpSwitcher.switchProfile' not found` になる不具合を修正。
-  jsonc-parser がバンドルに取り込まれていなかったため、esbuild を ESM エントリ優先に変更した。
-
 ## 0.1.0
 
-- Initial release.
-- Sidebar view listing MCP profiles and servers.
-- One-click enable/disable of individual servers.
-- Named profiles (save the current on/off combination, switch between them).
-- Status bar item showing the active profile and target.
-- Selectable target: workspace (`.kiro/settings/mcp.json`) or user (`~/.kiro/settings/mcp.json`).
-- Surgical JSON edits that preserve comments and formatting.
+- Initial release: sidebar view, per-server enable/disable, named profiles, workspace/user target.

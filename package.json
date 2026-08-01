@@ -2,7 +2,7 @@
   "name": "kiro-mcp-switcher",
   "displayName": "Kiro MCP Switcher",
   "description": "Switch Kiro MCP config presets (full mcpServers swap) and inspect the active mcp.json, without hand-editing JSON.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "ytkoka",
   "author": {
     "name": "ytkoka"
