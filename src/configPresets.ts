@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as fssync from 'fs';
 import * as path from 'path';
 import { resolveMcpPath, getTarget, Target } from './mcpConfig';
-import { extractMcpServers, replaceMcpServers, presetDocument, serversEqual } from './mcpEdit';
+import { extractMcpServers, replaceMcpServers, presetDocument, serversEqual, serverCount } from './mcpEdit';
 
 /** Directory holding preset files, next to the target mcp.json. */
 export function presetsDir(target: Target = getTarget()): string | undefined {
@@ -126,6 +126,27 @@ export async function deletePreset(name: string, target: Target = getTarget()): 
 
 export function presetFilePath(name: string, target: Target = getTarget()): string | undefined {
   return presetPath(name, target);
+}
+
+/** Number of servers defined in a preset file (0 = empty / missing). */
+export async function presetServerCount(
+  name: string,
+  target: Target = getTarget(),
+): Promise<number> {
+  const pp = presetPath(name, target);
+  if (!pp) return 0;
+  const txt = await readText(pp);
+  if (txt === undefined) return 0;
+  return serverCount(extractMcpServers(txt));
+}
+
+/** Number of servers currently defined in the target mcp.json. */
+export async function currentServerCount(target: Target = getTarget()): Promise<number> {
+  const p = resolveMcpPath(target);
+  if (!p) return 0;
+  const txt = await readText(p);
+  if (txt === undefined) return 0;
+  return serverCount(extractMcpServers(txt));
 }
 
 /** Take a timestamped snapshot of the current mcp.json (best-effort, keeps the last 10). */

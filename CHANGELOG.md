@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4
+
+- Guard against accidental data loss with empty presets: applying an empty preset now asks for
+  confirmation (it would clear mcp.json), and saving a preset while mcp.json has no servers asks
+  before creating an empty preset. Empty presets are marked "empty" with a warning icon in the tree.
+
 ## 0.2.3
 
 - Docs: update the README Install section for the published extension — install from the

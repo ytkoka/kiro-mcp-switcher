@@ -5,6 +5,7 @@ import {
   replaceMcpServers,
   presetDocument,
   serversEqual,
+  serverCount,
 } from '../src/mcpEdit';
 
 const DOC = `{
@@ -61,4 +62,10 @@ test('round-trip: extract from one doc, replace into another', () => {
   const target = `{\n  "mcpServers": {}\n}`;
   const out = replaceMcpServers(target, extractMcpServers(preset));
   assert.deepEqual(Object.keys(JSON.parse(out).mcpServers).sort(), ['alpha', 'beta']);
+});
+
+test('serverCount reports the number of servers (0 = empty)', () => {
+  assert.equal(serverCount({}), 0);
+  assert.equal(serverCount(extractMcpServers('{"mcpServers":{}}')), 0);
+  assert.equal(serverCount(extractMcpServers(DOC)), 2);
 });

@@ -16,6 +16,11 @@ export function extractMcpServers(text: string): Record<string, unknown> {
   return s && typeof s === 'object' ? (s as Record<string, unknown>) : {};
 }
 
+/** Number of servers defined in a servers object (0 = empty). */
+export function serverCount(servers: Record<string, unknown>): number {
+  return Object.keys(servers ?? {}).length;
+}
+
 /**
  * Replace ONLY the `mcpServers` block with the given object, preserving other
  * top-level keys and any comments outside the mcpServers block. This is the

@@ -13,6 +13,8 @@ import {
   hasSnapshot,
   presetFilePath,
   activePresetName,
+  presetServerCount,
+  currentServerCount,
 } from './configPresets';
 
 let statusBar: vscode.StatusBarItem;
@@ -217,6 +219,16 @@ async function applyPresetCmd(refresh: () => Promise<void>, preset?: string): Pr
   if (!name) {
     return;
   }
+  if ((await presetServerCount(name)) === 0) {
+    const confirm = await vscode.window.showWarningMessage(
+      `Preset "${name}" is empty. Applying it will remove all servers from the current mcp.json. Continue?`,
+      { modal: true },
+      'Apply Empty Preset',
+    );
+    if (confirm !== 'Apply Empty Preset') {
+      return;
+    }
+  }
   await guard(async () => {
     await applyPreset(name);
     await refresh();
@@ -231,6 +243,16 @@ async function savePresetCmd(refresh: () => Promise<void>): Promise<void> {
   });
   if (!name) {
     return;
+  }
+  if ((await currentServerCount()) === 0) {
+    const confirm = await vscode.window.showWarningMessage(
+      `The current mcp.json has no servers, so "${name.trim()}" would be saved as an empty preset. Applying an empty preset later clears mcp.json. Save it anyway?`,
+      { modal: true },
+      'Save Empty Preset',
+    );
+    if (confirm !== 'Save Empty Preset') {
+      return;
+    }
   }
   await guard(async () => {
     await savePresetFromCurrent(name.trim());

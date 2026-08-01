@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { getTarget, readMcpServers } from './mcpConfig';
-import { listPresets, activePresetName } from './configPresets';
+import { listPresets, activePresetName, presetServerCount } from './configPresets';
 import {
   childEntries,
   isLeaf,
@@ -11,7 +11,7 @@ import {
 
 type Node =
   | { kind: 'category'; id: 'presets' | 'active'; label: string }
-  | { kind: 'preset'; name: string; active: boolean }
+  | { kind: 'preset'; name: string; active: boolean; empty: boolean }
   | { kind: 'configserver'; name: string; value: unknown }
   | { kind: 'param'; key: string; value: unknown; sensitive: boolean }
   | { kind: 'message'; label: string };
@@ -42,9 +42,15 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
       case 'preset': {
         const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.None);
         item.contextValue = 'preset';
-        item.iconPath = new vscode.ThemeIcon(node.active ? 'pass-filled' : 'file-code');
-        if (node.active) {
-          item.description = 'active';
+        item.iconPath = new vscode.ThemeIcon(
+          node.active ? 'pass-filled' : node.empty ? 'warning' : 'file-code',
+        );
+        const tags = [node.active ? 'active' : '', node.empty ? 'empty' : ''].filter(Boolean);
+        if (tags.length) {
+          item.description = tags.join(' · ');
+        }
+        if (node.empty) {
+          item.tooltip = 'This preset has no servers. Applying it will clear mcp.json.';
         }
         item.command = {
           command: 'kiroMcpSwitcher.applyPreset',
@@ -98,7 +104,14 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
         return [{ kind: 'message', label: 'No presets yet — use "Save Current as Preset"' }];
       }
       const active = await activePresetName();
-      return names.map((name) => ({ kind: 'preset', name, active: name === active }));
+      return Promise.all(
+        names.map(async (name) => ({
+          kind: 'preset' as const,
+          name,
+          active: name === active,
+          empty: (await presetServerCount(name)) === 0,
+        })),
+      );
     }
     if (node.kind === 'category' && node.id === 'active') {
       const servers = await readMcpServers();
