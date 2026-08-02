@@ -2,7 +2,16 @@ import * as fs from 'fs/promises';
 import * as fssync from 'fs';
 import * as path from 'path';
 import { resolveMcpPath, getTarget, Target } from './mcpConfig';
-import { extractMcpServers, replaceMcpServers, presetDocument, serversEqual, serverCount } from './mcpEdit';
+import {
+  extractMcpServers,
+  replaceMcpServers,
+  presetDocument,
+  serversEqual,
+  serverCount,
+  sanitize,
+} from './mcpEdit';
+
+export { isValidPresetName } from './mcpEdit';
 
 /** Directory holding preset files, next to the target mcp.json. */
 export function presetsDir(target: Target = getTarget()): string | undefined {
@@ -20,11 +29,6 @@ function snapshotsDir(target: Target = getTarget()): string | undefined {
 function presetPath(name: string, target: Target = getTarget()): string | undefined {
   const d = presetsDir(target);
   return d ? path.join(d, `${sanitize(name)}.json`) : undefined;
-}
-
-/** Restrict preset names to safe filename characters. */
-export function sanitize(name: string): string {
-  return name.trim().replace(/[^\w.-]+/g, '-');
 }
 
 async function readText(p: string): Promise<string | undefined> {

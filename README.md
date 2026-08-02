@@ -71,7 +71,8 @@ All under the **Kiro MCP** category:
 
 - Apply Config Preset
 - Save Current as Preset
-- New Empty Preset
+- New Empty Preset (clears mcp.json to build fresh)
+- Update Preset from Current mcp.json
 - Duplicate Preset
 - Delete Preset
 - Open Preset File
@@ -90,14 +91,35 @@ A **config preset** is a named, complete `mcpServers` definition stored as a fil
 useful for testing a single endpoint (or a specific set) in isolation, which the enable/disable
 toggle can't do (disabled servers still exist in the config).
 
-- Create a preset by **Save Current as Preset**, **New Empty Preset** (opens for editing), or
+- Create a preset by **Save Current as Preset** (captures what's currently in mcp.json),
+  **New Empty Preset** (clears mcp.json so you build a fresh config directly — see below), or
   **Duplicate Preset**.
 - **Apply** swaps the block. mcp.json is **snapshotted first**; use **Restore Last Snapshot**
-  to roll back.
+  to roll back. Applying an empty preset (or saving one) asks for confirmation first, since it
+  would wipe out mcp.json's servers.
+- **Update Preset from Current mcp.json** (inline on each preset row) overwrites that preset with
+  whatever is currently in mcp.json — use it to save changes back without retyping the name.
 - After apply you're offered a one-click **Reload Window** so Kiro re-reads mcp.json; set
   `kiroMcpSwitcher.reloadWindowOnApplyPreset` to do it automatically for a fast test loop.
 - Presets follow the current target (workspace or user). Keep preset files out of version
   control if they contain anything sensitive.
+- Preset names must contain at least one letter or number — empty or symbol-only names (like `-`)
+  are rejected so they can't produce confusing files such as `-.json`.
+
+### Building a single-server preset from Kiro's "Add to Kiro"
+
+Kiro's official MCP directory has an "Add to Kiro" button on each server page that appends the
+server to your existing `mcp.json` — it doesn't let you start from a blank file. To capture that
+one server as its own preset:
+
+1. **New Empty Preset** — name it, confirm, and the extension snapshots the current mcp.json,
+   clears its `mcpServers` block, and opens the real `mcp.json` (not a preset file) for you.
+2. Use Kiro's **Add to Kiro** on the server you want — it appends into the now-empty `mcp.json`.
+3. Run **Update Preset from Current mcp.json** on the preset you just created to bake that one
+   server in.
+
+Your previous configuration wasn't lost — it's in the automatic snapshot, restorable with
+**Restore Last Snapshot**.
 
 ## Active Config view
 

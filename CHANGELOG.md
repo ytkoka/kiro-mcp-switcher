@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.5
+
+- Rework "New Empty Preset" into a clear flow: it now snapshots and clears the current mcp.json
+  (with confirmation) and opens the real mcp.json so you can build a fresh config directly (e.g.
+  via Kiro's "Add to Kiro", which appends to mcp.json). The previous config is restorable.
+- Add "Update Preset from Current mcp.json" (inline on each preset) to save what you built back
+  into that preset — no need to re-enter the name via Save.
+- Reject empty / symbol-only preset names (e.g. "-") that produced confusing files.
+
 ## 0.2.4
 
 - Guard against accidental data loss with empty presets: applying an empty preset now asks for

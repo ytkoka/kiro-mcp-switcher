@@ -6,6 +6,8 @@ import {
   presetDocument,
   serversEqual,
   serverCount,
+  isValidPresetName,
+  sanitize,
 } from '../src/mcpEdit';
 
 const DOC = `{
@@ -68,4 +70,22 @@ test('serverCount reports the number of servers (0 = empty)', () => {
   assert.equal(serverCount({}), 0);
   assert.equal(serverCount(extractMcpServers('{"mcpServers":{}}')), 0);
   assert.equal(serverCount(extractMcpServers(DOC)), 2);
+});
+
+test('isValidPresetName rejects empty and symbol-only names', () => {
+  assert.equal(isValidPresetName(''), false);
+  assert.equal(isValidPresetName('   '), false);
+  assert.equal(isValidPresetName('-'), false);
+  assert.equal(isValidPresetName('--_-'), false);
+});
+
+test('isValidPresetName accepts names with letters/numbers', () => {
+  assert.equal(isValidPresetName('aws'), true);
+  assert.equal(isValidPresetName('test-1'), true);
+  assert.equal(isValidPresetName('gmail user'), true);
+});
+
+test('sanitize makes a safe filename fragment', () => {
+  assert.equal(sanitize('gmail user'), 'gmail-user');
+  assert.equal(sanitize('  aws/copy  '), 'aws-copy');
 });

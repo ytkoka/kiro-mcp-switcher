@@ -53,3 +53,17 @@ function canonical(value: unknown): string {
   }
   return JSON.stringify(value);
 }
+
+/** Restrict preset names to safe filename characters. */
+export function sanitize(name: string): string {
+  return name.trim().replace(/[^\w.-]+/g, '-');
+}
+
+/**
+ * A preset name is valid only if, after sanitizing, it contains at least one
+ * alphanumeric character. Rejects empty and symbol-only names like "-" that
+ * would otherwise create confusing files such as "-.json".
+ */
+export function isValidPresetName(name: string): boolean {
+  return /[A-Za-z0-9]/.test(sanitize(name));
+}

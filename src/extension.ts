@@ -15,6 +15,7 @@ import {
   activePresetName,
   presetServerCount,
   currentServerCount,
+  isValidPresetName,
 } from './configPresets';
 
 let statusBar: vscode.StatusBarItem;
@@ -46,6 +47,9 @@ export function activate(context: vscode.ExtensionContext): void {
       savePresetCmd(refresh),
     ),
     vscode.commands.registerCommand('kiroMcpSwitcher.newEmptyPreset', () => newPresetCmd(refresh)),
+    vscode.commands.registerCommand('kiroMcpSwitcher.updatePresetFromCurrent', (arg?: unknown) =>
+      updateFromCurrentCmd(refresh, resolveName(arg)),
+    ),
     vscode.commands.registerCommand('kiroMcpSwitcher.duplicatePreset', (arg?: unknown) =>
       duplicatePresetCmd(refresh, resolveName(arg)),
     ),
@@ -239,7 +243,8 @@ async function applyPresetCmd(refresh: () => Promise<void>, preset?: string): Pr
 async function savePresetCmd(refresh: () => Promise<void>): Promise<void> {
   const name = await vscode.window.showInputBox({
     prompt: 'Name for this preset (captures the current mcp.json servers)',
-    validateInput: (v) => (v.trim() ? undefined : 'Please enter a name'),
+    validateInput: (v) =>
+      isValidPresetName(v) ? undefined : 'Enter a name with at least one letter or number',
   });
   if (!name) {
     return;
@@ -263,17 +268,58 @@ async function savePresetCmd(refresh: () => Promise<void>): Promise<void> {
 
 async function newPresetCmd(refresh: () => Promise<void>): Promise<void> {
   const name = await vscode.window.showInputBox({
-    prompt: 'Name for the new empty preset (opens for editing)',
-    validateInput: (v) => (v.trim() ? undefined : 'Please enter a name'),
+    prompt: 'Name for the new preset',
+    validateInput: (v) =>
+      isValidPresetName(v) ? undefined : 'Enter a name with at least one letter or number',
   });
   if (!name) {
     return;
   }
+  const confirm = await vscode.window.showWarningMessage(
+    `Create empty preset "${name.trim()}" and clear the current mcp.json so you can build a fresh config? The current config is snapshotted and can be restored.`,
+    { modal: true },
+    'Create & Clear',
+  );
+  if (confirm !== 'Create & Clear') {
+    return;
+  }
   await guard(async () => {
-    const p = await createEmptyPreset(name.trim());
+    await createEmptyPreset(name.trim());
+    // applying the empty preset snapshots the current mcp.json, then blanks it
+    await applyPreset(name.trim());
     await refresh();
-    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
-    await vscode.window.showTextDocument(doc);
+    // open the real mcp.json (not the preset file) so editing/adding servers is intuitive
+    const p = await ensureMcpFile();
+    if (p) {
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(p));
+      await vscode.window.showTextDocument(doc);
+    }
+    vscode.window.setStatusBarMessage(
+      `Cleared mcp.json. Build your config, then run "Update Preset from Current mcp.json" on "${name.trim()}".`,
+      6000,
+    );
+  });
+}
+
+async function updateFromCurrentCmd(refresh: () => Promise<void>, preset?: string): Promise<void> {
+  const name = preset ?? (await pickPreset('Update which preset from the current mcp.json?'));
+  if (!name) {
+    return;
+  }
+  if ((await currentServerCount()) === 0) {
+    const confirm = await vscode.window.showWarningMessage(
+      `The current mcp.json has no servers, so "${name}" would become an empty preset. Update anyway?`,
+      { modal: true },
+      'Update to Empty',
+    );
+    if (confirm !== 'Update to Empty') {
+      return;
+    }
+  }
+  await guard(async () => {
+    await savePresetFromCurrent(name);
+    await refresh();
+    vscode.window.setStatusBarMessage(`Updated preset "${name}" from the current mcp.json`, 2500);
   });
 }
 
@@ -285,7 +331,8 @@ async function duplicatePresetCmd(refresh: () => Promise<void>, preset?: string)
   const dst = await vscode.window.showInputBox({
     prompt: `Name for the copy of "${src}"`,
     value: `${src}-copy`,
-    validateInput: (v) => (v.trim() ? undefined : 'Please enter a name'),
+    validateInput: (v) =>
+      isValidPresetName(v) ? undefined : 'Enter a name with at least one letter or number',
   });
   if (!dst) {
     return;
