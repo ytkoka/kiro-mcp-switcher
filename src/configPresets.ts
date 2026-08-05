@@ -7,6 +7,7 @@ import {
   replaceMcpServers,
   presetDocument,
   serversEqual,
+  serversEqualIgnoringDisabled,
   serverCount,
   sanitize,
 } from './mcpEdit';
@@ -53,23 +54,41 @@ export async function listPresets(target: Target = getTarget()): Promise<string[
   }
 }
 
-/** Name of the preset whose mcpServers block matches the current mcp.json, if any. */
-export async function activePresetName(target: Target = getTarget()): Promise<string | undefined> {
+/**
+ * The active preset is the one whose servers match the current mcp.json.
+ * Matching ignores each server's `disabled` flag, so toggling disabled during
+ * testing keeps the preset shown as active. `modified` is true when the match
+ * only holds once `disabled` is ignored (i.e. the live config differs only by
+ * disabled flags).
+ */
+export async function activePresetInfo(
+  target: Target = getTarget(),
+): Promise<{ name?: string; modified: boolean }> {
   const p = resolveMcpPath(target);
-  if (!p) return undefined;
+  if (!p) return { modified: false };
   const cur = await readText(p);
-  if (cur === undefined) return undefined;
+  if (cur === undefined) return { modified: false };
   const curServers = extractMcpServers(cur);
+  let relaxed: string | undefined;
   for (const name of await listPresets(target)) {
     const pp = presetPath(name, target);
     if (!pp) continue;
     const txt = await readText(pp);
     if (txt === undefined) continue;
-    if (serversEqual(extractMcpServers(txt), curServers)) {
-      return name;
+    const ps = extractMcpServers(txt);
+    if (serversEqual(ps, curServers)) {
+      return { name, modified: false };
+    }
+    if (relaxed === undefined && serversEqualIgnoringDisabled(ps, curServers)) {
+      relaxed = name;
     }
   }
-  return undefined;
+  return relaxed ? { name: relaxed, modified: true } : { modified: false };
+}
+
+/** Name of the preset matching the current mcp.json (ignoring disabled flags), if any. */
+export async function activePresetName(target: Target = getTarget()): Promise<string | undefined> {
+  return (await activePresetInfo(target)).name;
 }
 
 async function ensureDir(d: string): Promise<void> {

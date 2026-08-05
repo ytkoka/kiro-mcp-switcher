@@ -134,6 +134,14 @@ icon lets you flip it true/false directly — no need to open mcp.json by hand. 
 mcp.json immediately and shows a light notification with a one-click **Reload Window** action, so
 switching several servers in a row doesn't interrupt you with modal dialogs.
 
+Toggling `disabled` this way does **not** deselect the active preset in the Config Presets list —
+preset matching ignores `disabled` flags, so the preset stays marked **active**. If the live
+config now differs from the preset file only by `disabled` flags, it's shown as
+**"active · modified"** instead of a plain "active". This is deliberate: it stops a stray click on
+the (still-shown-as-inactive) preset from re-applying it and silently reverting the disabled
+flags you just changed. Use **Update Preset from Current mcp.json** if you want to bake the new
+`disabled` state into the preset file itself.
+
 ## Build
 
 ```bash

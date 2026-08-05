@@ -51,6 +51,30 @@ export function serversEqual(a: unknown, b: unknown): boolean {
   return canonical(a) === canonical(b);
 }
 
+/** Deep-clone a servers object with every server's top-level `disabled` key removed. */
+function stripDisabled(servers: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (servers && typeof servers === 'object' && !Array.isArray(servers)) {
+    for (const [name, entry] of Object.entries(servers as Record<string, unknown>)) {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        const { disabled: _omit, ...rest } = entry as Record<string, unknown>;
+        out[name] = rest;
+      } else {
+        out[name] = entry;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Compare two server blocks ignoring each server's `disabled` flag. Used so that
+ * toggling `disabled` during testing doesn't make a preset look "not applied".
+ */
+export function serversEqualIgnoringDisabled(a: unknown, b: unknown): boolean {
+  return canonical(stripDisabled(a)) === canonical(stripDisabled(b));
+}
+
 function canonical(value: unknown): string {
   if (Array.isArray(value)) {
     return '[' + value.map(canonical).join(',') + ']';

@@ -9,6 +9,7 @@ import {
   isValidPresetName,
   sanitize,
   setServerDisabled,
+  serversEqualIgnoringDisabled,
 } from '../src/mcpEdit';
 
 const DOC = `{
@@ -111,4 +112,24 @@ test('setServerDisabled adds the flag when missing', () => {
   const doc = `{"mcpServers":{"a":{"url":"https://a"}}}`;
   const out = setServerDisabled(doc, 'a', true);
   assert.equal(JSON.parse(out).mcpServers.a.disabled, true);
+});
+
+test('serversEqualIgnoringDisabled treats disabled-only differences as equal', () => {
+  const a = { s: { command: 'x', args: ['a'], disabled: true } };
+  const b = { s: { command: 'x', args: ['a'], disabled: false } };
+  assert.equal(serversEqualIgnoringDisabled(a, b), true);
+});
+
+test('serversEqualIgnoringDisabled still detects real differences', () => {
+  const a = { s: { command: 'x', disabled: true } };
+  const b = { s: { command: 'y', disabled: true } };
+  assert.equal(serversEqualIgnoringDisabled(a, b), false);
+  // different server sets differ
+  assert.equal(serversEqualIgnoringDisabled({ s: {} }, { s: {}, t: {} }), false);
+});
+
+test('serversEqualIgnoringDisabled equal when disabled absent vs present', () => {
+  const a = { s: { command: 'x' } };
+  const b = { s: { command: 'x', disabled: true } };
+  assert.equal(serversEqualIgnoringDisabled(a, b), true);
 });

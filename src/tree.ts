@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { getTarget, readMcpServers } from './mcpConfig';
-import { listPresets, activePresetName, presetServerCount } from './configPresets';
+import { listPresets, activePresetInfo, presetServerCount } from './configPresets';
 import {
   childEntries,
   isLeaf,
@@ -11,7 +11,7 @@ import {
 
 type Node =
   | { kind: 'category'; id: 'presets' | 'active'; label: string }
-  | { kind: 'preset'; name: string; active: boolean; empty: boolean }
+  | { kind: 'preset'; name: string; active: boolean; empty: boolean; modified: boolean }
   | { kind: 'configserver'; name: string; value: unknown; disabled: boolean }
   | { kind: 'param'; key: string; value: unknown; sensitive: boolean; server: string; topLevel: boolean }
   | { kind: 'message'; label: string };
@@ -45,7 +45,11 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
         item.iconPath = new vscode.ThemeIcon(
           node.active ? 'pass-filled' : node.empty ? 'warning' : 'file-code',
         );
-        const tags = [node.active ? 'active' : '', node.empty ? 'empty' : ''].filter(Boolean);
+        const tags = [
+          node.active ? 'active' : '',
+          node.active && node.modified ? 'modified' : '',
+          node.empty ? 'empty' : '',
+        ].filter(Boolean);
         if (tags.length) {
           item.description = tags.join(' · ');
         }
@@ -108,12 +112,13 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
       if (names.length === 0) {
         return [{ kind: 'message', label: 'No presets yet — use "Save Current as Preset"' }];
       }
-      const active = await activePresetName();
+      const info = await activePresetInfo();
       return Promise.all(
         names.map(async (name) => ({
           kind: 'preset' as const,
           name,
-          active: name === active,
+          active: name === info.name,
+          modified: name === info.name && info.modified,
           empty: (await presetServerCount(name)) === 0,
         })),
       );

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.7
+
+- Toggling a server's `disabled` no longer makes the active preset look unselected. Preset
+  matching now ignores `disabled` flags, so the preset stays marked active; when the live config
+  differs from it only by disabled flags, it shows as "active · modified". This prevents
+  accidentally reverting a disabled toggle by re-clicking the preset (which would re-apply it).
+
 ## 0.2.6
 
 - Toggle a server's `disabled` flag directly from the Active Config tree: an inline edit action
