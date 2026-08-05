@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6
+
+- Toggle a server's `disabled` flag directly from the Active Config tree: an inline edit action
+  on the top-level `disabled` row flips true/false and writes to the current mcp.json (handy when
+  Kiro adds a new server as `disabled: true`). Disabled servers are marked in their server row,
+  and after toggling you get a light notification with a one-click Window Reload.
+
 ## 0.2.5
 
 - Rework "New Empty Preset" into a clear flow: it now snapshots and clears the current mcp.json

@@ -8,6 +8,7 @@ import {
   serverCount,
   isValidPresetName,
   sanitize,
+  setServerDisabled,
 } from '../src/mcpEdit';
 
 const DOC = `{
@@ -88,4 +89,26 @@ test('isValidPresetName accepts names with letters/numbers', () => {
 test('sanitize makes a safe filename fragment', () => {
   assert.equal(sanitize('gmail user'), 'gmail-user');
   assert.equal(sanitize('  aws/copy  '), 'aws-copy');
+});
+
+test('setServerDisabled sets the flag and preserves siblings/comments', () => {
+  const doc = `{
+  // servers
+  "mcpServers": {
+    "terraform": { "command": "docker", "args": ["x"], "disabled": true },
+    "other": { "url": "https://o" }
+  }
+}`;
+  const out = setServerDisabled(doc, 'terraform', false);
+  const root = JSON.parse(out.replace(/^\s*\/\/.*$/gm, ''));
+  assert.equal(root.mcpServers.terraform.disabled, false);
+  assert.equal(root.mcpServers.terraform.command, 'docker');
+  assert.equal(root.mcpServers.other.url, 'https://o');
+  assert.ok(out.includes('servers'));
+});
+
+test('setServerDisabled adds the flag when missing', () => {
+  const doc = `{"mcpServers":{"a":{"url":"https://a"}}}`;
+  const out = setServerDisabled(doc, 'a', true);
+  assert.equal(JSON.parse(out).mcpServers.a.disabled, true);
 });

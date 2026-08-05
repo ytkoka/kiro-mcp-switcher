@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import * as jsonc from 'jsonc-parser';
+import { setServerDisabled } from './mcpEdit';
 
 export type Target = 'workspace' | 'user';
 
@@ -55,4 +56,19 @@ export async function readMcpServers(
   } catch {
     return {};
   }
+}
+
+/** Set a server's `disabled` flag in the target mcp.json (surgical edit, preserves the rest). */
+export async function setServerDisabledFlag(
+  server: string,
+  disabled: boolean,
+  target: Target = getTarget(),
+): Promise<void> {
+  const p = resolveMcpPath(target);
+  if (!p) {
+    throw new Error('No workspace folder is open. Switch target to "user" or open a folder.');
+  }
+  const text = await fs.readFile(p, 'utf8');
+  const next = setServerDisabled(text, server, disabled);
+  await fs.writeFile(p, next, 'utf8');
 }

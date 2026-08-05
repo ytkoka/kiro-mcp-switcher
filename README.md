@@ -128,6 +128,12 @@ confirming what a preset applied. Values under sensitive keys (`Authorization`, 
 `secret`, `password`, …) are masked (`••••••`) by default; click the eye icon in the view title
 to reveal them for the current session.
 
+Disabled servers show a slashed-circle icon and a "disabled" label in their row. If a server has
+a top-level `disabled` row (Kiro sometimes adds new servers as `disabled: true`), an inline edit
+icon lets you flip it true/false directly — no need to open mcp.json by hand. Toggling writes to
+mcp.json immediately and shows a light notification with a one-click **Reload Window** action, so
+switching several servers in a row doesn't interrupt you with modal dialogs.
+
 ## Build
 
 ```bash

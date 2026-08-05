@@ -22,6 +22,15 @@ export function serverCount(servers: Record<string, unknown>): number {
 }
 
 /**
+ * Set `mcpServers.<server>.disabled` to a boolean, preserving the rest of the
+ * file (comments/formatting) via a surgical jsonc edit.
+ */
+export function setServerDisabled(text: string, server: string, disabled: boolean): string {
+  const edits = jsonc.modify(text, ['mcpServers', server, 'disabled'], disabled, FMT);
+  return jsonc.applyEdits(text, edits);
+}
+
+/**
  * Replace ONLY the `mcpServers` block with the given object, preserving other
  * top-level keys and any comments outside the mcpServers block. This is the
  * "full swap" used by config presets: after this, Kiro sees exactly the servers

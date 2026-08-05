@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { getTarget, Target, resolveMcpPath, ensureMcpFile } from './mcpConfig';
+import { getTarget, Target, resolveMcpPath, ensureMcpFile, setServerDisabledFlag } from './mcpConfig';
 import { McpTreeProvider } from './tree';
 import {
   listPresets,
@@ -40,6 +40,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('kiroMcpSwitcher.selectTarget', () => selectTarget(refresh)),
     vscode.commands.registerCommand('kiroMcpSwitcher.openConfig', openConfig),
     vscode.commands.registerCommand('kiroMcpSwitcher.toggleMask', () => toggleMask(refresh)),
+    vscode.commands.registerCommand('kiroMcpSwitcher.toggleDisabled', (arg?: unknown) =>
+      toggleDisabledCmd(refresh, arg),
+    ),
     vscode.commands.registerCommand('kiroMcpSwitcher.applyPreset', (arg?: unknown) =>
       applyPresetCmd(refresh, resolveName(arg)),
     ),
@@ -188,6 +191,30 @@ async function toggleMask(refresh: () => Promise<void>): Promise<void> {
     !current ? 'Sensitive values hidden' : 'Sensitive values shown',
     2000,
   );
+}
+
+/** Toggle a server's `disabled` flag from the Active Config tree (inline on the `disabled` row). */
+async function toggleDisabledCmd(refresh: () => Promise<void>, arg: unknown): Promise<void> {
+  if (!arg || typeof arg !== 'object') {
+    return;
+  }
+  const o = arg as { server?: unknown; value?: unknown };
+  if (typeof o.server !== 'string' || typeof o.value !== 'boolean') {
+    return;
+  }
+  const next = !o.value;
+  await guard(async () => {
+    await setServerDisabledFlag(o.server as string, next);
+    await refresh();
+    // light, non-blocking notification with an optional reload action
+    const choice = await vscode.window.showInformationMessage(
+      `${o.server}: disabled = ${next}. Reload the window for Kiro to pick it up.`,
+      'Reload Window',
+    );
+    if (choice === 'Reload Window') {
+      await vscode.commands.executeCommand('workbench.action.reloadWindow');
+    }
+  });
 }
 
 // ---------- config preset commands ----------

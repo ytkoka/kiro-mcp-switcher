@@ -12,8 +12,8 @@ import {
 type Node =
   | { kind: 'category'; id: 'presets' | 'active'; label: string }
   | { kind: 'preset'; name: string; active: boolean; empty: boolean }
-  | { kind: 'configserver'; name: string; value: unknown }
-  | { kind: 'param'; key: string; value: unknown; sensitive: boolean }
+  | { kind: 'configserver'; name: string; value: unknown; disabled: boolean }
+  | { kind: 'param'; key: string; value: unknown; sensitive: boolean; server: string; topLevel: boolean }
   | { kind: 'message'; label: string };
 
 function maskEnabled(): boolean {
@@ -62,7 +62,10 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
       case 'configserver': {
         const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.Collapsed);
         item.contextValue = 'configserver';
-        item.iconPath = new vscode.ThemeIcon('server');
+        item.iconPath = new vscode.ThemeIcon(node.disabled ? 'circle-slash' : 'server');
+        if (node.disabled) {
+          item.description = 'disabled';
+        }
         return item;
       }
       case 'param': {
@@ -71,7 +74,9 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
           node.key,
           leaf ? vscode.TreeItemCollapsibleState.None : vscode.TreeItemCollapsibleState.Collapsed,
         );
-        item.contextValue = 'param';
+        const isDisabledToggle =
+          node.topLevel && node.key === 'disabled' && typeof node.value === 'boolean';
+        item.contextValue = isDisabledToggle ? 'param:disabled' : 'param';
         if (leaf) {
           item.description = leafDisplay(node.value, node.sensitive, maskEnabled());
           if (node.sensitive && maskEnabled()) {
@@ -119,7 +124,12 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
       if (names.length === 0) {
         return [{ kind: 'message', label: 'No servers in the current mcp.json' }];
       }
-      return names.map((name) => ({ kind: 'configserver', name, value: servers[name] }));
+      return names.map((name) => {
+        const value = servers[name];
+        const disabled =
+          !!value && typeof value === 'object' && (value as Record<string, unknown>).disabled === true;
+        return { kind: 'configserver', name, value, disabled };
+      });
     }
     if (node.kind === 'configserver') {
       return childEntries(node.value).map((c) => ({
@@ -127,6 +137,8 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
         key: c.key,
         value: c.value,
         sensitive: isSensitiveKey(c.key),
+        server: node.name,
+        topLevel: true,
       }));
     }
     if (node.kind === 'param' && !isLeaf(node.value)) {
@@ -136,6 +148,8 @@ export class McpTreeProvider implements vscode.TreeDataProvider<Node> {
         value: c.value,
         // sensitivity propagates into nested subtrees
         sensitive: node.sensitive || isSensitiveKey(c.key),
+        server: node.server,
+        topLevel: false,
       }));
     }
     return [];
